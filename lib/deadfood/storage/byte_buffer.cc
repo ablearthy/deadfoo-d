@@ -39,12 +39,9 @@ double ByteBuffer::ReadDouble(size_t offset) const {
   return tmp.d;
 }
 
-std::unique_ptr<char[]> ByteBuffer::ReadVarchar(size_t offset,
+std::span<char> ByteBuffer::ReadVarchar(size_t offset,
                                                 size_t count) const {
-  std::unique_ptr<char[]> ptr{std::make_unique<char[]>(count)};
-  std::copy(storage_.get() + offset, storage_.get() + offset + count,
-            ptr.get());
-  return ptr;
+  return {storage_.get() + offset, count};
 }
 
 void ByteBuffer::WriteBool(size_t offset, bool value) {

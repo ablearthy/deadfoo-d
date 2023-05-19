@@ -53,9 +53,9 @@ void Row::SetField(const std::string& field_name, const FieldVariant& value) {
           if (info.type() == Field::FieldType::Double) {
             storage_.WriteDouble(offset, v);
           }
-        } else if constexpr (std::is_same_v<T, std::unique_ptr<char[]>>) {
+        } else if constexpr (std::is_same_v<T, std::span<char>>) {
           if (info.type() == Field::FieldType::Varchar) {
-            storage_.WriteVarchar(offset, v.get(), info.size());
+            storage_.WriteVarchar(offset, v.data(), info.size());
           }
         }
       },
