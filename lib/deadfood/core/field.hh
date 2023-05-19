@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <variant>
 #include <memory>
+#include <span>
 
 namespace deadfood::core {
 
@@ -23,7 +24,7 @@ class Field {
 struct null_t{};
 
 using FieldVariant =
-    std::variant<bool, int, float, double, std::unique_ptr<char[]>, null_t>;
+    std::variant<bool, int, float, double, std::span<char>, null_t>;
 
 namespace field {
 

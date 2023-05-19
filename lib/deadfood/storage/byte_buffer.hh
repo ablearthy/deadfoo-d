@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <span>
 
 namespace deadfood::storage {
 
@@ -14,7 +15,7 @@ class ByteBuffer {
   int ReadInt(size_t offset) const;
   float ReadFloat(size_t offset) const;
   double ReadDouble(size_t offset) const;
-  std::unique_ptr<char[]> ReadVarchar(size_t offset, size_t count) const;
+  std::span<char> ReadVarchar(size_t offset, size_t count) const;
 
   void WriteByte(size_t offset, char value);
   void WriteBool(size_t offset, bool value);
