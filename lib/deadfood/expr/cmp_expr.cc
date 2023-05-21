@@ -6,6 +6,18 @@ CmpExpr::CmpExpr(CmpOp op, std::unique_ptr<IExpr> lhs,
                  std::unique_ptr<IExpr> rhs)
     : op_{op}, lhs_{std::move(lhs)}, rhs_{std::move(rhs)} {}
 
+CmpExpr::CmpExpr(CmpExpr&& other) noexcept
+    : op_{other.op_},
+      lhs_{std::move(other.lhs_)},
+      rhs_{std::move(other.rhs_)} {}
+
+CmpExpr& CmpExpr::operator=(CmpExpr&& other) noexcept {
+  lhs_ = std::move(other.lhs_);
+  rhs_ = std::move(other.rhs_);
+  op_ = other.op_;
+  return *this;
+}
+
 template <typename L>
 bool CompareTrivial(L left, CmpOp op, const core::FieldVariant& rhs) {
   return std::visit(
