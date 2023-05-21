@@ -19,7 +19,7 @@ core::FieldVariant BoolExpr::Eval() {
   const auto val = internal_->Eval();
   return std::visit(
       [](auto&& arg) {
-        using T = decltype(arg);
+        using T = std::decay_t<decltype(arg)>;
 
         if constexpr (std::is_same_v<T, bool> || std::is_same_v<T, int> ||
                       std::is_same_v<T, float> || std::is_same_v<T, double>) {
@@ -32,5 +32,6 @@ core::FieldVariant BoolExpr::Eval() {
       },
       val);
 }
+
 
 }  // namespace deadfood::expr
