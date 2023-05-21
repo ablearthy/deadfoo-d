@@ -20,6 +20,7 @@ class ProductScan : public IScan {
  private:
   std::unique_ptr<IScan> lhs_;
   std::unique_ptr<IScan> rhs_;
+  bool lhs_has_rows;
 };
 
 }  // namespace deadfood::scan

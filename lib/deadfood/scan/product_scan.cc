@@ -3,7 +3,7 @@
 namespace deadfood::scan {
 
 ProductScan::ProductScan(std::unique_ptr<IScan> lhs, std::unique_ptr<IScan> rhs)
-    : lhs_{std::move(lhs)}, rhs_{std::move(rhs)} {}
+    : lhs_{std::move(lhs)}, rhs_{std::move(rhs)}, lhs_has_rows{lhs_->Next()} {}
 
 void ProductScan::BeforeFirst() {
   lhs_->BeforeFirst();
@@ -12,6 +12,9 @@ void ProductScan::BeforeFirst() {
 }
 
 bool ProductScan::Next() {
+  if (!lhs_has_rows) {
+    return false;
+  }
   if (rhs_->Next()) {
     return true;
   }
