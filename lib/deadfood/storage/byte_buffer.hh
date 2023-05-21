@@ -10,12 +10,12 @@ class ByteBuffer {
   explicit ByteBuffer(size_t size)
       : size_{size}, storage_{std::make_unique<char[]>(size)} {}
 
-  char ReadByte(size_t idx) const;
-  bool ReadBool(size_t offset) const;
-  int ReadInt(size_t offset) const;
-  float ReadFloat(size_t offset) const;
-  double ReadDouble(size_t offset) const;
-  std::span<char> ReadVarchar(size_t offset, size_t count) const;
+  [[nodiscard]] char ReadByte(size_t idx) const;
+  [[nodiscard]] bool ReadBool(size_t offset) const;
+  [[nodiscard]] int ReadInt(size_t offset) const;
+  [[nodiscard]] float ReadFloat(size_t offset) const;
+  [[nodiscard]] double ReadDouble(size_t offset) const;
+  [[nodiscard]] std::span<char> ReadVarchar(size_t offset, size_t count) const;
 
   void WriteByte(size_t offset, char value);
   void WriteBool(size_t offset, bool value);
