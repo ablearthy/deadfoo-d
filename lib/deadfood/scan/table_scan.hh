@@ -23,9 +23,7 @@ class TableScan : public IScan {
   void Delete() override;
 
   void Close() override;
-
-  ~TableScan() override = default;
-
+  
  private:
   storage::TableStorage& storage_;
   const core::Schema& schema_;

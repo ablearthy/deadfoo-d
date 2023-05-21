@@ -5,16 +5,6 @@ namespace deadfood::expr {
 BoolExpr::BoolExpr(std::unique_ptr<IExpr> internal)
     : internal_{std::move(internal)} {}
 
-BoolExpr::BoolExpr(BoolExpr&& other) noexcept
-    : internal_{std::move(other.internal_)} {}
-
-BoolExpr& BoolExpr::operator=(BoolExpr&& other) noexcept {
-  if (this != &other) {
-    internal_ = std::move(other.internal_);
-  }
-  return *this;
-}
-
 core::FieldVariant BoolExpr::Eval() {
   const auto val = internal_->Eval();
   return std::visit(
@@ -32,6 +22,5 @@ core::FieldVariant BoolExpr::Eval() {
       },
       val);
 }
-
 
 }  // namespace deadfood::expr

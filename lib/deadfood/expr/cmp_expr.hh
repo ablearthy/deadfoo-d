@@ -15,8 +15,6 @@ class CmpExpr : public IExpr {
 
   core::FieldVariant Eval() override;
 
-  ~CmpExpr() override = default;
-
  private:
   CmpOp op_;
   std::unique_ptr<IExpr> lhs_;
