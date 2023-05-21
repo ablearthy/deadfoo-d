@@ -15,7 +15,7 @@ class FieldExpr : public IExpr {
 
  private:
   scan::IScan* scan_;
-  const std::string& field_name_;
+  std::string field_name_;
 };
 
 }  // namespace deadfood::expr
