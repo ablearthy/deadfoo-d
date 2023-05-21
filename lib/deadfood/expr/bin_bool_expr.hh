@@ -13,7 +13,6 @@ class BinBoolExpr : public IExpr {
               std::unique_ptr<IExpr> rhs);
 
   core::FieldVariant Eval() override;
-  ~BinBoolExpr() override = default;
 
  private:
   BinBoolOp op_;

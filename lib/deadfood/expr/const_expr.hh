@@ -10,7 +10,6 @@ class ConstExpr : public IExpr {
 
   core::FieldVariant Eval() override;
 
-  ~ConstExpr() override = default;
  private:
   core::FieldVariant value_;
 };
