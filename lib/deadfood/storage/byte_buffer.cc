@@ -7,10 +7,10 @@ char ByteBuffer::ReadByte(size_t idx) const { return storage_[idx]; }
 bool ByteBuffer::ReadBool(size_t offset) const { return ReadInt(offset) != 0; }
 
 int ByteBuffer::ReadInt(size_t offset) const {
-  return static_cast<int>(storage_[offset]) |
-         (static_cast<int>(storage_[offset + 1]) << 8) |
-         (static_cast<int>(storage_[offset + 2]) << 16) |
-         (static_cast<int>(storage_[offset + 3]) << 24);
+  return static_cast<int>(static_cast<uint8_t>(storage_[offset])) |
+         (static_cast<int>(static_cast<uint8_t>(storage_[offset + 1])) << 8) |
+         (static_cast<int>(static_cast<uint8_t>(storage_[offset + 2])) << 16) |
+         (static_cast<int>(static_cast<uint8_t>(storage_[offset + 3])) << 24);
 }
 
 float ByteBuffer::ReadFloat(size_t offset) const {
@@ -39,8 +39,7 @@ double ByteBuffer::ReadDouble(size_t offset) const {
   return tmp.d;
 }
 
-std::span<char> ByteBuffer::ReadVarchar(size_t offset,
-                                                size_t count) const {
+std::span<char> ByteBuffer::ReadVarchar(size_t offset, size_t count) const {
   return {storage_.get() + offset, count};
 }
 
