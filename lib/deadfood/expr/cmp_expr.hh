@@ -10,6 +10,9 @@ class CmpExpr : public IExpr {
  public:
   CmpExpr(CmpOp op, std::unique_ptr<IExpr> lhs, std::unique_ptr<IExpr> rhs);
 
+  CmpExpr(CmpExpr&& other) noexcept;
+  CmpExpr& operator=(CmpExpr&& other) noexcept;
+
   core::FieldVariant Eval() override;
 
   ~CmpExpr() override = default;
