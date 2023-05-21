@@ -5,15 +5,12 @@
 
 namespace deadfood::expr {
 
-enum class BinBoolOp {
-  And,
-  Or,
-  Xor
-};
+enum class BinBoolOp { And, Or, Xor };
 
 class BinBoolExpr : public IExpr {
  public:
-  BinBoolExpr(BinBoolOp op, std::unique_ptr<IExpr> lhs, std::unique_ptr<IExpr> rhs);
+  BinBoolExpr(BinBoolOp op, std::unique_ptr<IExpr> lhs,
+              std::unique_ptr<IExpr> rhs);
 
   core::FieldVariant Eval() override;
   ~BinBoolExpr() override = default;
@@ -23,4 +20,5 @@ class BinBoolExpr : public IExpr {
   BoolExpr lhs_;
   BoolExpr rhs_;
 };
+
 }  // namespace deadfood::expr
