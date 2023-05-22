@@ -1,9 +1,18 @@
-#include <stdexcept>
 #include "lex.hh"
+
+#include <stdexcept>
+#include <algorithm>
+#include <cctype>
 
 namespace deadfood::lex {
 
 bool IsDigit(char c) { return '0' <= c && c <= '9'; }
+
+bool IsAlph(char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'); }
+
+bool IsValidForKeywordOrId(char c) {
+  return IsAlph(c) || IsDigit(c) || c == '_' || c == '.';
+}
 
 template <typename T>
 T WithSign(T num, bool is_neg) {
@@ -99,8 +108,54 @@ std::vector<Token> Lex(std::string_view input) {
     } else if (input[0] == '\'') {
       auto tok = ParseString(input);
       tokens.emplace_back(std::move(tok));
+    } else if (IsAlph(input[0])) {  // keyword or id
+      std::string str, lowercase_str;
+      while (!input.empty() && IsValidForKeywordOrId(input[0])) {
+        str += input[0];
+        lowercase_str += static_cast<char>(
+            std::tolower(static_cast<unsigned char>(input[0])));
+        input.remove_prefix(1);
+      }
+
+      if (kKeywords.contains(lowercase_str)) {
+        tokens.emplace_back(kKeywordLiteralToKeyword.at(lowercase_str));
+      } else {
+        tokens.emplace_back(Identifier{str});
+      }
     } else {
-      // id or keyword
+      switch (input[0]) {
+        case '(':
+          tokens.emplace_back(Symbol::LParen);
+          break;
+        case ')':
+          tokens.emplace_back(Symbol::RParen);
+          break;
+        case '=':
+          tokens.emplace_back(Symbol::Eq);
+          break;
+        case '<':
+          tokens.emplace_back(Symbol::Less);
+          break;
+        case '>':
+          tokens.emplace_back(Symbol::More);
+          break;
+        case '+':
+          tokens.emplace_back(Symbol::Plus);
+          break;
+        case '-':
+          tokens.emplace_back(Symbol::Minus);
+          break;
+        case '*':
+          tokens.emplace_back(Symbol::Mul);
+          break;
+        case '/':
+          tokens.emplace_back(Symbol::Div);
+          break;
+        default:
+          throw std::runtime_error("unknown symbol `" +
+                                   std::to_string(input[0]) + "`");
+      }
+      input.remove_prefix(1);
     }
   }
   return tokens;
