@@ -82,6 +82,9 @@ enum class Symbol {
 
 struct Identifier {
   std::string id;
+
+  bool operator==(const Identifier& other) const;
+  bool operator!=(const Identifier& other) const;
 };
 
 using Token =
