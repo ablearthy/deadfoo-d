@@ -6,6 +6,14 @@
 
 namespace deadfood::lex {
 
+bool Identifier::operator==(const Identifier& other) const {
+  return id == other.id;
+}
+
+bool Identifier::operator!=(const Identifier& other) const {
+  return id != other.id;
+}
+
 bool IsDigit(char c) { return '0' <= c && c <= '9'; }
 
 bool IsAlph(char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'); }
