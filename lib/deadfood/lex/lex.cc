@@ -161,4 +161,14 @@ std::vector<Token> Lex(std::string_view input) {
   return tokens;
 }
 
+bool IsKeyword(const lex::Token& tok, lex::Keyword keyword) {
+  return std::holds_alternative<lex::Keyword>(tok) &&
+         std::get<lex::Keyword>(tok) == keyword;
+}
+
+bool IsSymbol(const lex::Token& tok, lex::Symbol sym) {
+  return std::holds_alternative<lex::Symbol>(tok) &&
+         std::get<lex::Symbol>(tok) == sym;
+}
+
 }  // namespace deadfood::lex

@@ -78,4 +78,8 @@ using Token =
 
 std::vector<Token> Lex(std::string_view input);
 
+bool IsKeyword(const lex::Token& tok, lex::Keyword keyword);
+
+bool IsSymbol(const lex::Token& tok, lex::Symbol sym);
+
 }  // namespace deadfood::lex
