@@ -161,6 +161,7 @@ std::vector<Token> Lex(std::string_view input) {
           break;
         case ',':
           tokens.emplace_back(Symbol::Comma);
+          break;
         default:
           throw std::runtime_error("unknown symbol `" +
                                    std::to_string(input[0]) + "`");
