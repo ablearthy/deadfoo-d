@@ -106,10 +106,10 @@ std::optional<LocalConstraint> TryReadLocalConstraint(It& it, const It end) {
   return std::nullopt;
 }
 
-template <typename It>
+template <std::forward_iterator It>
 Field ReadField(It& it, const It end) {
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
-    throw CreateTableParseError("expected table name");
+    throw CreateTableParseError("expected field name");
   }
 
   const auto& [field_name] = std::get<lex::Identifier>(*it);
@@ -197,11 +197,18 @@ core::ReferencesConstraint ParseReferencesConstraint(
 
   ExpectSymbol(it, end, lex::Symbol::RParen,
                "expected `)` while parsing constraint");
+  return core::ReferencesConstraint{
+      .master_table = master_table_name,
+      .master_field = master_field_name,
+      .slave_table = table_name,
+      .slave_field = slave_field_name,
+      .on_delete = core::ReferencesConstraint::OnAction::NoAction,
+      .on_update = core::ReferencesConstraint::OnAction::NoAction};
 }
 
 std::pair<query::CreateTableQuery, std::vector<core::Constraint>>
 ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
-  auto it = tokens.begin();
+  auto it = tokens.cbegin();
   ExpectKeyword(it, tokens.cend(), lex::Keyword::Create, "invalid query");
   ++it;
   ExpectKeyword(it, tokens.cend(), lex::Keyword::Table, "invalid query");
@@ -230,7 +237,9 @@ ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
       }
       query.AddField(field.name, field.type, field.is_unique,
                      field.may_be_null);
-      ++it;
+      if (!lex::IsSymbol(*it, lex::Symbol::RParen)) {
+        ++it;
+      }
     }
   }
   return {query, constraints};
