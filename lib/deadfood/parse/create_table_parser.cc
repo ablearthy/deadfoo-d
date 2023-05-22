@@ -200,7 +200,7 @@ core::ReferencesConstraint ParseReferencesConstraint(
 }
 
 std::pair<query::CreateTableQuery, std::vector<core::Constraint>>
-deadfood::parse::ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
+ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
   auto it = tokens.begin();
   ExpectKeyword(it, tokens.cend(), lex::Keyword::Create, "invalid query");
   ++it;
