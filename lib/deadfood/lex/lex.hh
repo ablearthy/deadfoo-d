@@ -67,7 +67,18 @@ static std::map<std::string, Keyword> kKeywordLiteralToKeyword = {
     {"unique", Keyword::Unique},   {"not", Keyword::Not},
 };
 
-enum class Symbol { LParen, RParen, Eq, Less, More, Plus, Minus, Mul, Div };
+enum class Symbol {
+  LParen,
+  RParen,
+  Eq,
+  Less,
+  More,
+  Plus,
+  Minus,
+  Mul,
+  Div,
+  Comma
+};
 
 struct Identifier {
   std::string id;
