@@ -2,6 +2,9 @@
 
 namespace deadfood::storage {
 
+ByteBuffer::ByteBuffer(size_t size, std::unique_ptr<char[]> ptr)
+    : size_{size}, storage_{std::move(ptr)} {}
+
 const char* ByteBuffer::data() const { return storage_.get(); }
 
 size_t ByteBuffer::size() const { return size_; }
