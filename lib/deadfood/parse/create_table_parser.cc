@@ -4,6 +4,7 @@
 #include <optional>
 
 #include <deadfood/core/field.hh>
+#include <deadfood/parse/parser_error.hh>
 
 namespace deadfood::parse {
 
@@ -15,7 +16,7 @@ template <typename It>
 void ExpectKeyword(const It& it, const It end, const lex::Keyword& keyword,
                    const std::string& message) {
   if (it == end || !lex::IsKeyword(*it, keyword)) {
-    throw CreateTableParseError(message);
+    throw ParserError(message);
   }
 }
 
@@ -23,17 +24,17 @@ template <typename It>
 void ExpectSymbol(const It& it, const It end, const lex::Symbol& symbol,
                   const std::string& message) {
   if (it == end || !lex::IsSymbol(*it, symbol)) {
-    throw CreateTableParseError(message);
+    throw ParserError(message);
   }
 }
 
 std::string GetTableName(const lex::Token& tok) {
   if (!std::holds_alternative<lex::Identifier>(tok)) {
-    throw CreateTableParseError("invalid name for table");
+    throw ParserError("invalid name for table");
   }
   const auto& [str] = std::get<lex::Identifier>(tok);
   if (str.cend() != std::find(str.cbegin(), str.cend(), '.')) {
-    throw CreateTableParseError("incorrect table name: it contains `.`");
+    throw ParserError("incorrect table name: it contains `.`");
   }
   return str;
 }
@@ -54,7 +55,7 @@ using LocalConstraint = std::variant<Unique, NotNull, PrimaryKey>;
 template <typename It>
 core::Field ReadFieldType(It& it, const It end) {
   if (it == end) {
-    throw CreateTableParseError("expected type of field");
+    throw ParserError("expected type of field");
   }
   if (lex::IsKeyword(*it, lex::Keyword::Int)) {
     return core::field::kIntField;
@@ -75,11 +76,11 @@ core::Field ReadFieldType(It& it, const It end) {
   ++it;
 
   if (it == end || !std::holds_alternative<int>(*it)) {
-    throw CreateTableParseError("expected constant int");
+    throw ParserError("expected constant int");
   }
   const auto size = std::get<int>(*it);
   if (size <= 0) {
-    throw CreateTableParseError("varchar cannot have negative size");
+    throw ParserError("varchar cannot have negative size");
   }
   ++it;
 
@@ -109,12 +110,12 @@ std::optional<LocalConstraint> TryReadLocalConstraint(It& it, const It end) {
 template <std::forward_iterator It>
 Field ReadField(It& it, const It end) {
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
-    throw CreateTableParseError("expected field name");
+    throw ParserError("expected field name");
   }
 
   const auto& [field_name] = std::get<lex::Identifier>(*it);
   if (ContainsDot(field_name)) {
-    throw CreateTableParseError("incorrect field name: it contains `.`");
+    throw ParserError("incorrect field name: it contains `.`");
   }
   ++it;
 
@@ -161,12 +162,12 @@ core::ReferencesConstraint ParseReferencesConstraint(
   ++it;
 
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
-    throw CreateTableParseError("expected field name");
+    throw ParserError("expected field name");
   }
   const auto [slave_field_name] = std::get<lex::Identifier>(*it);
   ++it;
   if (ContainsDot(slave_field_name)) {
-    throw CreateTableParseError("expected valid slave field name");
+    throw ParserError("expected valid slave field name");
   }
 
   ExpectKeyword(it, end, lex::Keyword::References,
@@ -174,11 +175,11 @@ core::ReferencesConstraint ParseReferencesConstraint(
   ++it;
 
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
-    throw CreateTableParseError("expected master table name");
+    throw ParserError("expected master table name");
   }
   const auto [master_table_name] = std::get<lex::Identifier>(*it);
   if (ContainsDot(master_table_name)) {
-    throw CreateTableParseError("master table name contains dot");
+    throw ParserError("master table name contains dot");
   }
   ++it;
 
@@ -187,11 +188,11 @@ core::ReferencesConstraint ParseReferencesConstraint(
 
   ++it;
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
-    throw CreateTableParseError("expected master table name");
+    throw ParserError("expected master table name");
   }
   const auto [master_field_name] = std::get<lex::Identifier>(*it);
   if (ContainsDot(master_field_name)) {
-    throw CreateTableParseError("master field name contains dot");
+    throw ParserError("master field name contains dot");
   }
   ++it;
 
@@ -233,7 +234,7 @@ ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
     } else {  // field definition
       const auto field = ReadField(it, tokens.cend());
       if (query.Contains(field.name)) {
-        throw CreateTableParseError("duplicate field");
+        throw ParserError("duplicate field");
       }
       query.AddField(field.name, field.type, field.is_unique,
                      field.may_be_null);
