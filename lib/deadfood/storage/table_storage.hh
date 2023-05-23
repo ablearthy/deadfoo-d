@@ -13,6 +13,9 @@ class TableStorage {
   [[nodiscard]] bool Exists(size_t row_id) const;
 
   std::map<size_t, ByteBuffer>& storage();
+  [[nodiscard]] const std::map<size_t, ByteBuffer>& storage_const() const;
+
+
 
  private:
   std::map<size_t, ByteBuffer> storage_;

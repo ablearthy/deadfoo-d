@@ -9,6 +9,7 @@ namespace deadfood::storage {
 
 class DBStorage {
  public:
+  const TableStorage& GetConst(const std::string& table_name) const;
   TableStorage& Get(const std::string& table_name);
 
   bool Exists(const std::string& table_name) const;
