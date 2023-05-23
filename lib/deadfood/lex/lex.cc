@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 
 namespace deadfood::lex {
 
@@ -163,8 +164,9 @@ std::vector<Token> Lex(std::string_view input) {
           tokens.emplace_back(Symbol::Comma);
           break;
         default:
-          throw std::runtime_error("unknown symbol `" +
-                                   std::to_string(input[0]) + "`");
+          std::stringstream ss;
+          ss << "unknown symbol `" << input[0] << '`';
+          throw std::runtime_error(ss.str());
       }
       input.remove_prefix(1);
     }
