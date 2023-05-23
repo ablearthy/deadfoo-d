@@ -113,7 +113,14 @@ void DumpConstraints(const std::vector<core::Constraint>& constraints,
   }
 }
 
-void DumpTable(const storage::TableStorage& storage, std::ostream& stream) {}
+void DumpTable(const storage::TableStorage& storage, std::ostream& stream,
+               const size_t row_size) {
+  binary::PutUint<size_t>(stream, row_size);
+  for (const auto& [rowid, row_buf] : storage.storage_const()) {
+    binary::PutUint<size_t>(stream, rowid);
+    binary::PutBytes(stream, row_buf.data(), row_buf.size());
+  }
+}
 
 void Dump(const Database& db, const std::filesystem::path& path) {
   std::ofstream schema_stream(path / ".schema", std::ios::binary);
@@ -124,7 +131,8 @@ void Dump(const Database& db, const std::filesystem::path& path) {
 
   for (const auto& table_name : db.table_names()) {
     std::ofstream table_stream(path / (table_name + ".dat"), std::ios::binary);
-    DumpTable(db.table_storage_const(table_name), table_stream);
+    const auto row_size = db.schemas().at(table_name).size();
+    DumpTable(db.table_storage_const(table_name), table_stream, row_size);
   }
 }
 
