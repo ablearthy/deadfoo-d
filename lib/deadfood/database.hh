@@ -13,6 +13,8 @@ namespace deadfood {
 
 class Database {
  public:
+  Database() = default;
+
   Database(storage::DBStorage& storage,
            std::map<std::string, core::Schema>& schemas,
            std::vector<core::Constraint>& constraints);
@@ -21,7 +23,8 @@ class Database {
   const std::vector<core::Constraint>& constraints_const() const;
 
   storage::TableStorage& table_storage(const std::string& table_name);
-  const storage::TableStorage& table_storage_const(const std::string& table_name) const;
+  const storage::TableStorage& table_storage_const(
+      const std::string& table_name) const;
   const std::set<std::string>& table_names() const;
   const std::map<std::string, core::Schema>& schemas() const;
   [[nodiscard]] bool Exists(const std::string& table_name) const;
