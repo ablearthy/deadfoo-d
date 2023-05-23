@@ -88,6 +88,7 @@ void DumpSchemas(const std::map<std::string, core::Schema>& schemas,
                  std::ostream& stream) {
   for (const auto& [table_name, schema] : schemas) {
     binary::PutCString(stream, table_name);
+    binary::PutUint<uint32_t>(stream, schema.fields().size());
     for (const auto& field : schema.fields()) {
       const auto& field_info = schema.field_info(field);
       binary::PutCString(stream, field);
@@ -113,9 +114,7 @@ void DumpConstraints(const std::vector<core::Constraint>& constraints,
   }
 }
 
-void DumpTable(const storage::TableStorage& storage, std::ostream& stream,
-               const size_t row_size) {
-  binary::PutUint<size_t>(stream, row_size);
+void DumpTable(const storage::TableStorage& storage, std::ostream& stream) {
   for (const auto& [rowid, row_buf] : storage.storage_const()) {
     binary::PutUint<size_t>(stream, rowid);
     binary::PutBytes(stream, row_buf.data(), row_buf.size());
@@ -132,8 +131,76 @@ void Dump(const Database& db, const std::filesystem::path& path) {
   for (const auto& table_name : db.table_names()) {
     std::ofstream table_stream(path / (table_name + ".dat"), std::ios::binary);
     const auto row_size = db.schemas().at(table_name).size();
-    DumpTable(db.table_storage_const(table_name), table_stream, row_size);
+    DumpTable(db.table_storage_const(table_name), table_stream);
   }
+}
+
+std::map<std::string, core::Schema> LoadSchemas(std::istream& stream) {
+  std::map<std::string, core::Schema> map;
+  while (stream) {
+    const auto table_name = binary::GetCString(stream);
+    const uint32_t fields_count = binary::GetUint<uint32_t>(stream);
+    core::Schema schema;
+    for (uint32_t i = 0; i < fields_count; ++i) {
+      const auto field_name = binary::GetCString(stream);
+      const auto field_type =
+          static_cast<core::Field::FieldType>(binary::GetUint<uint8_t>(stream));
+      const uint32_t field_size = binary::GetUint<uint32_t>(stream);
+      schema.AddField(field_name, core::Field{field_type, field_size});
+    }
+    map.emplace(table_name, std::move(schema));
+  }
+  return map;
+}
+
+std::vector<core::Constraint> LoadConstraint(std::istream& stream) {
+  std::vector<core::Constraint> ret;
+
+  while (stream) {
+    const auto slave_table = binary::GetCString(stream);
+    const auto slave_field = binary::GetCString(stream);
+    const auto master_table = binary::GetCString(stream);
+    const auto master_field = binary::GetCString(stream);
+    ret.emplace_back(core::ReferencesConstraint{
+        .master_table = master_table,
+        .master_field = master_field,
+        .slave_table = slave_table,
+        .slave_field = slave_field,
+        .on_delete = core::ReferencesConstraint::OnAction::NoAction,
+        .on_update = core::ReferencesConstraint::OnAction::NoAction,
+    });
+  }
+
+  return ret;
+}
+
+storage::TableStorage LoadTable(std::istream& stream, const size_t row_size) {
+  storage::TableStorage storage;
+  auto& internal_storage = storage.storage();
+  while (stream) {
+    const size_t rowid = binary::GetUint<size_t>(stream);
+    auto ptr = binary::GetBytes(stream, row_size);
+    internal_storage.emplace(rowid,
+                             storage::ByteBuffer{row_size, std::move(ptr)});
+  }
+  return storage;
+}
+
+Database Load(const std::filesystem::path& path) {
+  storage::DBStorage db_storage;
+  std::ifstream schema_stream(path / ".schemas", std::ios::binary);
+  auto schemas = LoadSchemas(schema_stream);
+  std::ifstream constraints_stream(path / ".constraints", std::ios::binary);
+  auto constraints = LoadConstraint(constraints_stream);
+
+  for (const auto& [table_name, _] : schemas) {
+    std::ifstream table_stream(path / (table_name + ".dat"), std::ios::binary);
+    const auto row_size = schemas.at(table_name).size();
+    auto table = LoadTable(table_stream, row_size);
+    db_storage.Add(table_name, table);
+  }
+  Database db{db_storage, schemas, constraints};
+  return db;
 }
 
 }  // namespace deadfood
