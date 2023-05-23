@@ -15,6 +15,7 @@ class DBStorage {
   bool Exists(const std::string& table_name) const;
 
   void Add(const std::string& table_name);
+  void Add(const std::string& table_name, TableStorage& storage);
   void Remove(const std::string& table_name);
 
  private:
