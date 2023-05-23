@@ -13,6 +13,8 @@
 #include <deadfood/scan/select_scan.hh>
 #include <deadfood/lex/lex.hh>
 #include <deadfood/parse/create_table_parser.hh>
+#include <deadfood/parse/drop_table_parser.hh>
+#include <deadfood/parse/parser_error.hh>
 #include <deadfood/database.hh>
 
 #include <readline/readline.h>
@@ -24,13 +26,70 @@ using namespace deadfood::scan;
 using namespace deadfood::expr;
 using namespace deadfood::lex;
 using namespace deadfood::parse;
+using namespace deadfood::query;
 using namespace deadfood;
 
+void ExecuteCreateTableQuery(
+    Database& db,
+    const std::pair<query::CreateTableQuery, std::vector<core::Constraint>>&
+        query) {
+  const auto& [q, constraints] = query;
+  if (db.Exists(q.table_name())) {
+    throw std::runtime_error("table already exists");
+  }
+  Schema schema;
+  for (const auto& field_name : q.field_names()) {
+    const auto field = q.GetField(field_name);
+    schema.AddField(field_name, field);
+  }
+  db.AddTable(q.table_name(), schema);
+  for (const auto& c : constraints) {
+    db.constraints().emplace_back(c);
+  }
+}
+
+void ExecuteDropTableQuery(Database& db, const std::string& table_name) {}
+
+void ProcessQueryInternal(Database& db, const std::vector<Token> tokens) {
+  if (IsKeyword(tokens[0], Keyword::Create)) {  // create table query
+    const auto q = ParseCreateTableQuery(tokens);
+    ExecuteCreateTableQuery(db, q);
+  } else if (IsKeyword(tokens[0], Keyword::Drop)) {  // drop table query
+    const auto q = ParseDropTableQuery(tokens);
+    ExecuteDropTableQuery(db, q);
+  } else if (IsKeyword(tokens[0], Keyword::Update)) {  // update query
+
+  } else if (IsKeyword(tokens[0], Keyword::Delete)) {  // delete query
+
+  } else if (IsKeyword(tokens[0], Keyword::Insert)) {  // insert query
+
+  } else if (IsKeyword(tokens[0], Keyword::Select)) {  // select query
+
+  } else {
+    std::cout << "unknown query\n";
+    return;
+  }
+}
 void ProcessQuery(Database& db, const std::string& query) {
+  std::vector<Token> tokens;
   try {
-    const auto tokens = Lex(query);
+    tokens = Lex(query);
   } catch (const std::runtime_error& err) {
     std::cout << "[error (lex)] " << err.what() << '\n';
+    return;
+  }
+  if (tokens.empty()) {
+    std::cout << "expected some input\n";
+    return;
+  }
+  try {
+    ProcessQueryInternal(db, tokens);
+  } catch (const ParserError& e) {
+    std::cout << "[error (parse)] " << e.what() << '\n';
+    return;
+  } catch (const std::runtime_error& err) {
+    std::cout << "[error (runtime)] " << err.what() << '\n';
+    return;
   }
 }
 
