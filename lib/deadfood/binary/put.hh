@@ -11,7 +11,7 @@ template <std::unsigned_integral T>
 void PutUint(std::ostream& stream, T val) {
   const size_t bytes_count = sizeof(T);
   for (int i = bytes_count - 1; i >= 0; --i) {
-    int shift = 8 * i;
+    auto shift = static_cast<size_t>(8 * i);
     const T mask = 0xff << shift;
     const auto byte = static_cast<uint8_t>((val & mask) >> shift);
     stream.put(static_cast<char>(byte));
