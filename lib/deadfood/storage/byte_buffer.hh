@@ -10,6 +10,9 @@ class ByteBuffer {
   explicit ByteBuffer(size_t size)
       : size_{size}, storage_{std::make_unique<char[]>(size)} {}
 
+  [[nodiscard]] const char* data() const;
+  [[nodiscard]] size_t size() const;
+
   [[nodiscard]] char ReadByte(size_t idx) const;
   [[nodiscard]] bool ReadBool(size_t offset) const;
   [[nodiscard]] int ReadInt(size_t offset) const;

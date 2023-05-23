@@ -2,6 +2,10 @@
 
 namespace deadfood::storage {
 
+const char* ByteBuffer::data() const { return storage_.get(); }
+
+size_t ByteBuffer::size() const { return size_; }
+
 char ByteBuffer::ReadByte(size_t idx) const { return storage_[idx]; }
 
 bool ByteBuffer::ReadBool(size_t offset) const { return ReadInt(offset) != 0; }
@@ -76,7 +80,7 @@ void ByteBuffer::WriteDouble(size_t offset, double value) {
   // TODO: check endianness
 }
 
-void ByteBuffer::WriteVarchar(size_t offset, const char *value, size_t size) {
+void ByteBuffer::WriteVarchar(size_t offset, const char* value, size_t size) {
   std::copy(value, value + size, storage_.get() + offset);
 }
 
