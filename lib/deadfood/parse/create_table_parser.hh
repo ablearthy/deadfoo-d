@@ -8,11 +8,6 @@
 
 namespace deadfood::parse {
 
-class CreateTableParseError : public std::runtime_error {
- public:
-  using std::runtime_error::runtime_error;
-};
-
 std::pair<query::CreateTableQuery, std::vector<core::Constraint>>
 ParseCreateTableQuery(const std::vector<lex::Token>& tokens);
 

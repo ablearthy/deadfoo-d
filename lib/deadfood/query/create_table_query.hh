@@ -12,6 +12,8 @@ class CreateTableQuery {
  public:
   explicit CreateTableQuery(const std::string& table_name);
 
+  const std::string& table_name() const;
+
   void AddField(const std::string& field_name, const core::Field& field,
                 bool is_unique, bool may_be_null);
 

@@ -5,6 +5,8 @@ namespace deadfood::query {
 CreateTableQuery::CreateTableQuery(const std::string& table_name)
     : table_name_{table_name} {}
 
+const std::string& CreateTableQuery::table_name() const { return table_name_; }
+
 bool CreateTableQuery::Contains(const std::string& field_name) const {
   return field_indices_.contains(field_name);
 }
