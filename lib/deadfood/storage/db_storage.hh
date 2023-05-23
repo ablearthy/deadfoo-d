@@ -14,6 +14,7 @@ class DBStorage {
   bool Exists(const std::string& table_name) const;
 
   void Add(const std::string& table_name);
+  void Remove(const std::string& table_name);
 
  private:
   std::unordered_map<std::string, TableStorage> storage_;

@@ -13,4 +13,10 @@ void DBStorage::Add(const std::string& table_name) {
   storage_.emplace(table_name, TableStorage{});
 }
 
+void DBStorage::Remove(const std::string& table_name) {
+  if (Exists(table_name)) {
+    storage_.erase(table_name);
+  }
+}
+
 }  // namespace deadfood::storage
