@@ -9,6 +9,8 @@ namespace deadfood::storage {
 
 class DBStorage {
  public:
+  DBStorage() = default;
+
   const TableStorage& GetConst(const std::string& table_name) const;
   TableStorage& Get(const std::string& table_name);
 
