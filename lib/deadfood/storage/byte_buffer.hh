@@ -10,6 +10,8 @@ class ByteBuffer {
   explicit ByteBuffer(size_t size)
       : size_{size}, storage_{std::make_unique<char[]>(size)} {}
 
+  ByteBuffer(size_t size, std::unique_ptr<char[]> ptr);
+
   [[nodiscard]] const char* data() const;
   [[nodiscard]] size_t size() const;
 
