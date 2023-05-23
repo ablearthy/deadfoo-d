@@ -2,9 +2,14 @@
 
 namespace deadfood::storage {
 
+const TableStorage& DBStorage::GetConst(const std::string& table_name) const {
+  return storage_.at(table_name);
+}
+
 TableStorage& DBStorage::Get(const std::string& table_name) {
   return storage_[table_name];
 }
+
 bool DBStorage::Exists(const std::string& table_name) const {
   return storage_.contains(table_name);
 }
