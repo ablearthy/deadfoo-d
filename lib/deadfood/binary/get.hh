@@ -38,6 +38,12 @@ std::string GetCString(std::istream& stream) {
   return ret;
 }
 
+std::unique_ptr<char[]> GetBytes(std::istream& stream, size_t size) {
+  auto ptr = std::make_unique<char[]>(size);
+  stream.read(ptr.get(), static_cast<long>(size));
+  return ptr;
+}
+
 template <std::floating_point T>
 T GetFloatingPoint(std::istream& stream) {
   union {

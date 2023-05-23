@@ -27,6 +27,10 @@ void PutCString(std::ostream& stream, const std::string& string) {
   stream.write(string.c_str(), static_cast<long>(string.size() + 1));
 }
 
+void PutBytes(std::ostream& stream, const char* bytes, size_t size) {
+  stream.write(bytes, static_cast<long>(size));
+}
+
 template <std::floating_point T>
 void PutFloatingPoint(std::ostream& stream, T val) {
   union {
