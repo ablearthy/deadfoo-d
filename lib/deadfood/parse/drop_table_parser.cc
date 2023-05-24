@@ -3,15 +3,9 @@
 #include <algorithm>
 #include <deadfood/parse/parser_error.hh>
 
+#include <deadfood/util/str.hh>
+
 namespace deadfood::parse {
-
-namespace { // TODO: take out ContainsDot function, since it is used multiple time
-
-bool ContainsDot(const std::string& str) {
-  return std::find(str.cbegin(), str.cend(), '.') != str.cend();
-}
-
-}  // namespace
 
 std::string ParseDropTableQuery(const std::vector<lex::Token>& tokens) {
   if (tokens.size() != 3) {
@@ -27,9 +21,10 @@ std::string ParseDropTableQuery(const std::vector<lex::Token>& tokens) {
     throw ParserError("expected identifier: table name");
   }
   auto table_name = std::get<lex::Identifier>(tokens[2]).id;
-  if (ContainsDot(table_name)) {
+  if (deadfood::util::ContainsDot(table_name)) {
     throw ParserError("table name contains invalid characters");
   }
   return table_name;
 }
+
 }  // namespace deadfood::parse

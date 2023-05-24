@@ -5,28 +5,10 @@
 
 #include <deadfood/core/field.hh>
 #include <deadfood/parse/parser_error.hh>
+#include <deadfood/util/parse.hh>
+#include <deadfood/util/str.hh>
 
 namespace deadfood::parse {
-
-bool ContainsDot(const std::string& str) {
-  return std::find(str.cbegin(), str.cend(), '.') != str.cend();
-}
-
-template <typename It>
-void ExpectKeyword(const It& it, const It end, const lex::Keyword& keyword,
-                   const std::string& message) {
-  if (it == end || !lex::IsKeyword(*it, keyword)) {
-    throw ParserError(message);
-  }
-}
-
-template <typename It>
-void ExpectSymbol(const It& it, const It end, const lex::Symbol& symbol,
-                  const std::string& message) {
-  if (it == end || !lex::IsSymbol(*it, symbol)) {
-    throw ParserError(message);
-  }
-}
 
 std::string GetTableName(const lex::Token& tok) {
   if (!std::holds_alternative<lex::Identifier>(tok)) {
@@ -70,9 +52,9 @@ core::Field ReadFieldType(It& it, const It end) {
     return core::field::kDoubleField;
   }
 
-  ExpectKeyword(it, end, lex::Keyword::Varchar, "unknown field type");
+  util::ExpectKeyword(it, end, lex::Keyword::Varchar, "unknown field type");
   ++it;
-  ExpectSymbol(it, end, lex::Symbol::LParen, "expected `(`");
+  util::ExpectSymbol(it, end, lex::Symbol::LParen, "expected `(`");
   ++it;
 
   if (it == end || !std::holds_alternative<int>(*it)) {
@@ -84,7 +66,7 @@ core::Field ReadFieldType(It& it, const It end) {
   }
   ++it;
 
-  ExpectSymbol(it, end, lex::Symbol::RParen, "expected `)`");
+  util::ExpectSymbol(it, end, lex::Symbol::RParen, "expected `)`");
   return core::field::VarcharField(static_cast<size_t>(size));
 }
 
@@ -92,13 +74,13 @@ template <typename It>
 std::optional<LocalConstraint> TryReadLocalConstraint(It& it, const It end) {
   if (lex::IsKeyword(*it, lex::Keyword::Primary)) {
     ++it;
-    ExpectKeyword(it, end, lex::Keyword::Key, "expected `KEY`");
+    util::ExpectKeyword(it, end, lex::Keyword::Key, "expected `KEY`");
     return PrimaryKey{};
   }
 
   if (lex::IsKeyword(*it, lex::Keyword::Not)) {
     ++it;
-    ExpectKeyword(it, end, lex::Keyword::Null, "expected `NULL`");
+    util::ExpectKeyword(it, end, lex::Keyword::Null, "expected `NULL`");
     return NotNull{};
   }
   if (lex::IsKeyword(*it, lex::Keyword::Unique)) {
@@ -114,7 +96,7 @@ Field ReadField(It& it, const It end) {
   }
 
   const auto& [field_name] = std::get<lex::Identifier>(*it);
-  if (ContainsDot(field_name)) {
+  if (deadfood::util::ContainsDot(field_name)) {
     throw ParserError("incorrect field name: it contains `.`");
   }
   ++it;
@@ -154,11 +136,11 @@ Field ReadField(It& it, const It end) {
 template <typename It>
 core::ReferencesConstraint ParseReferencesConstraint(
     const std::string& table_name, It& it, const It end) {
-  ExpectKeyword(it, end, lex::Keyword::Foreign,
-                "expected `FOREIGN` while parsing constraint");
+  util::ExpectKeyword(it, end, lex::Keyword::Foreign,
+                      "expected `FOREIGN` while parsing constraint");
   ++it;
-  ExpectKeyword(it, end, lex::Keyword::Key,
-                "expected `KEY` while parsing constraint");
+  util::ExpectKeyword(it, end, lex::Keyword::Key,
+                      "expected `KEY` while parsing constraint");
   ++it;
 
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
@@ -166,38 +148,38 @@ core::ReferencesConstraint ParseReferencesConstraint(
   }
   const auto [slave_field_name] = std::get<lex::Identifier>(*it);
   ++it;
-  if (ContainsDot(slave_field_name)) {
+  if (deadfood::util::ContainsDot(slave_field_name)) {
     throw ParserError("expected valid slave field name");
   }
 
-  ExpectKeyword(it, end, lex::Keyword::References,
-                "expected `REFERENCES` while parsing constraint");
+  util::ExpectKeyword(it, end, lex::Keyword::References,
+                      "expected `REFERENCES` while parsing constraint");
   ++it;
 
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
     throw ParserError("expected master table name");
   }
   const auto [master_table_name] = std::get<lex::Identifier>(*it);
-  if (ContainsDot(master_table_name)) {
+  if (deadfood::util::ContainsDot(master_table_name)) {
     throw ParserError("master table name contains dot");
   }
   ++it;
 
-  ExpectSymbol(it, end, lex::Symbol::LParen,
-               "expected `(` while parsing constraint");
+  util::ExpectSymbol(it, end, lex::Symbol::LParen,
+                     "expected `(` while parsing constraint");
 
   ++it;
   if (it == end || !std::holds_alternative<lex::Identifier>(*it)) {
     throw ParserError("expected master table name");
   }
   const auto [master_field_name] = std::get<lex::Identifier>(*it);
-  if (ContainsDot(master_field_name)) {
+  if (deadfood::util::ContainsDot(master_field_name)) {
     throw ParserError("master field name contains dot");
   }
   ++it;
 
-  ExpectSymbol(it, end, lex::Symbol::RParen,
-               "expected `)` while parsing constraint");
+  util::ExpectSymbol(it, end, lex::Symbol::RParen,
+                     "expected `)` while parsing constraint");
   return core::ReferencesConstraint{
       .master_table = master_table_name,
       .master_field = master_field_name,
@@ -210,15 +192,15 @@ core::ReferencesConstraint ParseReferencesConstraint(
 std::pair<query::CreateTableQuery, std::vector<core::Constraint>>
 ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
   auto it = tokens.cbegin();
-  ExpectKeyword(it, tokens.cend(), lex::Keyword::Create, "invalid query");
+  util::ExpectKeyword(it, tokens.cend(), lex::Keyword::Create, "invalid query");
   ++it;
-  ExpectKeyword(it, tokens.cend(), lex::Keyword::Table, "invalid query");
+  util::ExpectKeyword(it, tokens.cend(), lex::Keyword::Table, "invalid query");
   ++it;
 
   const auto table_name = GetTableName(*it);
   ++it;
 
-  ExpectSymbol(it, tokens.cend(), lex::Symbol::LParen, "expected `(`");
+  util::ExpectSymbol(it, tokens.cend(), lex::Symbol::LParen, "expected `(`");
   ++it;
 
   query::CreateTableQuery query(table_name);
