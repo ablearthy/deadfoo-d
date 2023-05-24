@@ -14,6 +14,10 @@ TableScan::TableScan(storage::TableStorage& storage, const core::Schema& schema,
       cur_row_should_be_deleted_{false},
       before_start_{true} {}
 
+void TableScan::set_table_name(const std::string& table_name) {
+  table_name_ = table_name;
+}
+
 void TableScan::BeforeFirst() {
   if (cur_row_should_be_deleted_) {
     storage_.storage().erase(it_);

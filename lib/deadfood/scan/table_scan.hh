@@ -11,6 +11,8 @@ class TableScan : public IScan {
   TableScan(storage::TableStorage& storage, const core::Schema& schema,
             const std::string& table_name);
 
+  void set_table_name(const std::string& table_name);
+
   void BeforeFirst() override;
   bool Next() override;
 
