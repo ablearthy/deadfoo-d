@@ -5,9 +5,13 @@
 
 namespace deadfood::parse {
 
+namespace { // TODO: take out ContainsDot function, since it is used multiple time
+
 bool ContainsDot(const std::string& str) {
   return std::find(str.cbegin(), str.cend(), '.') != str.cend();
 }
+
+}  // namespace
 
 std::string ParseDropTableQuery(const std::vector<lex::Token>& tokens) {
   if (tokens.size() != 3) {
