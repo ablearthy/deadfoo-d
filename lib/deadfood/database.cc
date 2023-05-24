@@ -81,7 +81,7 @@ std::unique_ptr<scan::TableScan> Database::GetTableScan(
     const std::string& table_name) {
   auto& schema = schemas_.at(table_name);
   auto& table_storage = storage_.Get(table_name);
-  return std::make_unique<scan::TableScan>(table_storage, schema);
+  return std::make_unique<scan::TableScan>(table_storage, schema, table_name);
 }
 
 void DumpSchemas(const std::map<std::string, core::Schema>& schemas,
