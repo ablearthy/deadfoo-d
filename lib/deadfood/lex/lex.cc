@@ -23,22 +23,8 @@ bool IsValidForKeywordOrId(char c) {
   return IsAlph(c) || IsDigit(c) || c == '_' || c == '.';
 }
 
-template <typename T>
-T WithSign(T num, bool is_neg) {
-  if (is_neg) {
-    return -num;
-  }
-  return num;
-}
-
 Token ParseNumber(std::string_view& input) {
-  bool is_neg = false;
   int integral_part = 0;
-
-  if (input[0] == '-' || input[0] == '+') {
-    is_neg = (input[0] == '-');
-    input.remove_prefix(1);
-  }
 
   if (input.empty() || !IsDigit(input[0])) {
     throw std::runtime_error("expected number, got only minus");
@@ -50,7 +36,7 @@ Token ParseNumber(std::string_view& input) {
   }
 
   if (input.empty() || input[0] != '.') {
-    return WithSign(integral_part, is_neg);
+    return integral_part;
   }
 
   input.remove_prefix(1);  // consume dot
@@ -63,7 +49,7 @@ Token ParseNumber(std::string_view& input) {
     mul *= 0.1;
     input.remove_prefix(1);
   }
-  return WithSign(static_cast<double>(integral_part) + frac_part, is_neg);
+  return static_cast<double>(integral_part) + frac_part;
 }
 
 std::string ParseString(std::string_view input) {
@@ -110,8 +96,7 @@ std::vector<Token> Lex(std::string_view input) {
       input.remove_prefix(1);
       continue;
     }
-    if (input[0] == '-' || input[0] == '+' ||
-        ('0' <= input[0] && input[0] <= '9')) {
+    if (('0' <= input[0] && input[0] <= '9')) {
       auto tok = ParseNumber(input);
       tokens.emplace_back(std::move(tok));
     } else if (input[0] == '\'') {
