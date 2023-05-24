@@ -5,6 +5,8 @@
 #include <deadfood/parse/parser_error.hh>
 
 #include <optional>
+#include <vector>
+#include <algorithm>
 
 namespace deadfood::parse {
 
@@ -100,11 +102,14 @@ std::optional<expr::FactorTree> ParseFactorTree(It& it, const It end) {
                     *it);
 }
 
-static const std::vector<expr::GenBinOp> kPrecedence = {
-    expr::GenBinOp::And, expr::GenBinOp::Or,   expr::GenBinOp::Xor,
-    expr::GenBinOp::LE,  expr::GenBinOp::GE,   expr::GenBinOp::GT,
-    expr::GenBinOp::LT,  expr::GenBinOp::Eq,   expr::GenBinOp::Mul,
-    expr::GenBinOp::Div, expr::GenBinOp::Plus, expr::GenBinOp::Minus};
+static const std::vector<std::vector<expr::GenBinOp>> kPrecedence = {
+    {expr::GenBinOp::And},
+    {expr::GenBinOp::Or},
+    {expr::GenBinOp::Xor},
+    {expr::GenBinOp::LE, expr::GenBinOp::GE, expr::GenBinOp::GT,
+     expr::GenBinOp::LT, expr::GenBinOp::Eq},
+    {expr::GenBinOp::Plus, expr::GenBinOp::Minus},
+    {expr::GenBinOp::Mul, expr::GenBinOp::Div}};
 
 template <typename It>
 std::optional<expr::GenBinOp> ParseOp(It& it, const It end) {
@@ -163,47 +168,82 @@ template <typename It, typename ItOp>
 expr::FactorTree BuildTree(It begin_factors, It end_factors, ItOp begin_op,
                            ItOp end_op, size_t op_idx) {
   if (op_idx == kPrecedence.size()) {
+    if (begin_factors == end_factors) {
+      throw ParserError("expected some term");
+    }
     return *begin_factors;
   }
   std::vector<expr::FactorTree> factors;
+  expr::FactorTree ret;
+
+  expr::GenBinOp cur_op;
+
   auto last_op = begin_op;
   auto last_factor = begin_factors;
   auto it_op = begin_op;
   size_t factors_count = 1;
   for (; it_op != end_op; ++it_op) {
-    if (*it_op != kPrecedence[op_idx]) {
+    const auto& prec = kPrecedence[op_idx];
+    const auto maybe_it = std::find(prec.cbegin(), prec.cend(), *it_op);
+    if (maybe_it == prec.cend()) {
       ++factors_count;
-      continue;
+    } else {
+      cur_op = *it_op;
+      break;
     }
-    if (factors_count == 1) {
-      factors.emplace_back(*last_factor);
-      ++last_factor;
-      ++last_op;
-      continue;
+  }
+  auto factor = BuildTree(last_factor, last_factor + factors_count, last_op,
+                          it_op, op_idx + 1);
+  factors.emplace_back(factor);
+  last_factor += factors_count;
+  if (it_op == end_op) {
+    last_op = it_op;
+  } else {
+    last_op = it_op + 1;
+  }
+  factors_count = 1;
+
+  while (last_factor != end_factors) {
+    if (it_op != end_op) {
+      ++it_op;
     }
-    auto factor = BuildTree(last_factor, last_factor + factors_count, last_op,
-                            it_op, op_idx + 1);
+    for (; it_op != end_op; ++it_op) {
+      const auto& prec = kPrecedence[op_idx];
+      const auto maybe_it = std::find(prec.begin(), prec.end(), *it_op);
+      if (maybe_it == prec.end()) {
+        ++factors_count;
+      } else {
+        break;
+      }
+    }
+
+    factor = BuildTree(last_factor, last_factor + factors_count, last_op, it_op,
+                       op_idx + 1);
     factors.emplace_back(factor);
     last_factor += factors_count;
-    last_op = it_op + 1;
+    if (it_op == end_op) {
+      last_op = it_op;
+    } else {
+      last_op = it_op + 1;
+    }
     factors_count = 1;
-  }
-  if (factors.empty()) {
-    return BuildTree(begin_factors, end_factors, begin_op, end_op, op_idx + 1);
-  }
 
-  if (last_factor != end_factors) {
-    auto factor =
-        BuildTree(last_factor, end_factors, last_op, end_op, op_idx + 1);
-    factors.emplace_back(std::move(factor));
+    if (cur_op != *it_op) {
+      auto expr = expr::ExprTree{.op = cur_op, .factors = factors};
+      factors.clear();
+      factors.emplace_back(expr::FactorTree{
+          .neg_applied = false, .not_applied = false, .factor = expr});
+      cur_op = *it_op;
+    }
   }
 
   if (factors.size() == 1) {
     return factors[0];
   }
-  auto expr = expr::ExprTree{.op = kPrecedence[op_idx], .factors = factors};
   return expr::FactorTree{
-      .neg_applied = false, .not_applied = false, .factor = expr};
+      .neg_applied = false,
+      .not_applied = false,
+      .factor = expr::ExprTree{.op = cur_op, .factors = factors}};
 }
 
 template <typename It>
