@@ -8,7 +8,8 @@ namespace deadfood::scan {
 
 class TableScan : public IScan {
  public:
-  TableScan(storage::TableStorage& storage, const core::Schema& schema);
+  TableScan(storage::TableStorage& storage, const core::Schema& schema,
+            const std::string& table_name);
 
   void BeforeFirst() override;
   bool Next() override;
@@ -23,13 +24,17 @@ class TableScan : public IScan {
   void Delete() override;
 
   void Close() override;
-  
+
  private:
+  std::string table_name_;
   storage::TableStorage& storage_;
   const core::Schema& schema_;
   decltype(storage_.storage().begin()) it_;
   bool cur_row_should_be_deleted_;
   bool before_start_;
+
+  [[nodiscard]] std::string NormalizeFieldName(
+      const std::string& field_name) const;
 };
 
 }  // namespace deadfood::scan
