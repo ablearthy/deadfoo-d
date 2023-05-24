@@ -5,6 +5,6 @@
 
 namespace deadfood::parse {
 
-expr::ExprTree ParseExprTree(const std::vector<lex::Token>& tokens);
+expr::FactorTree ParseExprTree(const std::vector<lex::Token>& tokens);
 
 }  // namespace deadfood::parse

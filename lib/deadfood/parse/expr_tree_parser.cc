@@ -4,7 +4,7 @@
 namespace deadfood::parse {
 
 template <typename It>
-expr::ExprTree ParseExprTreeInternal(It& it, const It end);
+expr::FactorTree ParseExprTreeInternal(It& it, const It end);
 
 template <typename It>
 struct my_visitor {
@@ -30,9 +30,7 @@ struct my_visitor {
       } else {
         ++it;
       }
-      return expr::FactorTree{.neg_applied = neg_applied,
-                              .not_applied = not_applied,
-                              .factor = expr};
+      return expr;
     }
     throw ParserError("expected `(`");
   }
@@ -95,9 +93,9 @@ expr::FactorTree ParseFactorTree(It& it, const It end) {
 }
 
 static const std::vector<expr::GenBinOp> kPrecedence = {
+    expr::GenBinOp::And, expr::GenBinOp::Or,   expr::GenBinOp::Xor,
     expr::GenBinOp::LE,  expr::GenBinOp::GE,   expr::GenBinOp::GT,
-    expr::GenBinOp::LT,  expr::GenBinOp::Eq,   expr::GenBinOp::And,
-    expr::GenBinOp::Or,  expr::GenBinOp::Xor,  expr::GenBinOp::Mul,
+    expr::GenBinOp::LT,  expr::GenBinOp::Eq,   expr::GenBinOp::Mul,
     expr::GenBinOp::Div, expr::GenBinOp::Plus, expr::GenBinOp::Minus};
 
 template <typename It>
@@ -152,8 +150,55 @@ expr::GenBinOp ParseOp(It& it, const It end) {
   }
 }
 
+template <typename It, typename ItOp>
+expr::FactorTree BuildTree(It begin_factors, It end_factors, ItOp begin_op,
+                           ItOp end_op, size_t op_idx) {
+  if (op_idx == kPrecedence.size()) {
+    return *begin_factors;
+  }
+  std::vector<expr::FactorTree> factors;
+  auto last_op = begin_op;
+  auto last_factor = begin_factors;
+  auto it_op = begin_op;
+  size_t factors_count = 1;
+  for (; it_op != end_op; ++it_op) {
+    if (*it_op != kPrecedence[op_idx]) {
+      ++factors_count;
+      continue;
+    }
+    if (factors_count == 1) {
+      factors.emplace_back(*last_factor);
+      ++last_factor;
+      ++last_op;
+      continue;
+    }
+    auto factor = BuildTree(last_factor, last_factor + factors_count, last_op,
+                            it_op, op_idx + 1);
+    factors.emplace_back(factor);
+    last_factor += factors_count;
+    last_op = it_op + 1;
+    factors_count = 1;
+  }
+  if (factors.empty()) {
+    return BuildTree(begin_factors, end_factors, begin_op, end_op, op_idx + 1);
+  }
+
+  if (last_factor != end_factors) {
+    auto factor =
+        BuildTree(last_factor, end_factors, last_op, end_op, op_idx + 1);
+    factors.emplace_back(std::move(factor));
+  }
+
+  if (factors.size() == 1) {
+    return factors[0];
+  }
+  auto expr = expr::ExprTree{.op = kPrecedence[op_idx], .factors = factors};
+  return expr::FactorTree{
+      .neg_applied = false, .not_applied = false, .factor = expr};
+}
+
 template <typename It>
-expr::ExprTree ParseExprTreeInternal(It& it, const It end) {
+expr::FactorTree ParseExprTreeInternal(It& it, const It end) {
   std::vector<expr::GenBinOp> ops;
   std::vector<expr::FactorTree> factors;
   while (it != end) {
@@ -163,9 +208,14 @@ expr::ExprTree ParseExprTreeInternal(It& it, const It end) {
     }
     ops.emplace_back(ParseOp(it, end));
   }
+  if (ops.size() + 1 != factors.size()) {
+    throw ParserError("invalid expression");
+  }
+
+  return BuildTree(factors.begin(), factors.end(), ops.begin(), ops.end(), 0);
 }
 
-expr::ExprTree ParseExprTree(const std::vector<lex::Token>& tokens) {
+expr::FactorTree ParseExprTree(const std::vector<lex::Token>& tokens) {
   auto it = tokens.cbegin();
   return ParseExprTreeInternal(it, tokens.cend());
 }
