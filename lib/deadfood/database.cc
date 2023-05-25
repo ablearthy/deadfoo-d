@@ -98,6 +98,10 @@ void DumpSchemas(const std::map<std::string, core::Schema>& schemas,
     for (const auto& field : schema.fields()) {
       const auto& field_info = schema.field_info(field);
       binary::PutCString(stream, field);
+      binary::PutUint<uint8_t>(stream,
+                               static_cast<uint8_t>(schema.MayBeNull(field)));
+      binary::PutUint<uint8_t>(stream,
+                               static_cast<uint8_t>(schema.IsUnique(field)));
       binary::PutUint<uint8_t>(stream, static_cast<uint8_t>(field_info.type()));
       binary::PutUint<uint32_t>(stream,
                                 static_cast<uint32_t>(field_info.size()));
@@ -149,10 +153,15 @@ std::map<std::string, core::Schema> LoadSchemas(std::istream& stream) {
     core::Schema schema;
     for (uint32_t i = 0; i < fields_count; ++i) {
       const auto field_name = binary::GetCString(stream);
+      const auto may_be_null =
+          static_cast<bool>(binary::GetUint<uint8_t>(stream));
+      const auto is_unique =
+          static_cast<bool>(binary::GetUint<uint8_t>(stream));
       const auto field_type =
           static_cast<core::Field::FieldType>(binary::GetUint<uint8_t>(stream));
       const uint32_t field_size = binary::GetUint<uint32_t>(stream);
-      schema.AddField(field_name, core::Field{field_type, field_size});
+      schema.AddField(field_name, core::Field{field_type, field_size},
+                      may_be_null, is_unique);
     }
     map.emplace(table_name, std::move(schema));
   }

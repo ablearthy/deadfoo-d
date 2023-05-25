@@ -43,7 +43,8 @@ void ExecuteCreateTableQuery(
   Schema schema;
   for (const auto& field_name : q.field_names()) {
     const auto field = q.GetField(field_name);
-    schema.AddField(field_name, field);
+    schema.AddField(field_name, field, q.MayBeNull(field_name),
+                    q.IsUnique(field_name));
   }
   db.AddTable(q.table_name(), schema);
   for (const auto& c : constraints) {
@@ -89,7 +90,20 @@ void ExecuteDropTableQuery(Database& db, const std::string& table_name) {
   db.RemoveTable(table_name);
 }
 
-void ExecuteInsertQuery(Database& db, const InsertQuery& query) {}
+void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
+  if (!db.Exists(query.table_name)) {
+    throw std::runtime_error("table does not exist");
+  }
+  if (query.fields.has_value()) {
+    // check not null
+    const auto& schema = db.schemas().at(query.table_name);
+    std::set<std::string> query_fields{query.fields->begin(),
+                                       query.fields->end()};
+    for (const auto& field : schema.fields()) {
+      const auto& info = schema.field_info(field);
+    }
+  }
+}
 
 void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
   if (IsKeyword(tokens[0], Keyword::Create)) {  // create table query
