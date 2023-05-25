@@ -95,6 +95,7 @@ void ExecuteDropTableQuery(Database& db, const std::string& table_name) {
 }
 
 void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
+  // TODO: unique check
   if (!db.Exists(query.table_name)) {
     throw std::runtime_error("table does not exist");
   }
@@ -208,7 +209,12 @@ void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
     const auto q = ParseInsertQuery(tokens);
     ExecuteInsertQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Select)) {  // select query
-
+    auto scan = db.GetTableScan("test_tbl");
+    scan->BeforeFirst();
+    while (scan->Next()) {
+      std::cout << std::get<int>(scan->GetField("a")) << ' '
+                << std::get<int>(scan->GetField("b")) << '\n';
+    }
   } else {
     std::cout << "unknown query\n";
     return;
@@ -238,21 +244,19 @@ void ProcessQuery(Database& db, const std::string& query) {
 }
 
 int main() {
-  auto x = 12 * 1.3;
-  //  auto db = Load("/tmp/f");
-  //  for (const auto& tbl : db.table_names()) {
-  //    std::cout << tbl << '\n';
-  //  }
-  //  Database db;
-  //  char* query_buf;
-  //  while ((query_buf = readline("> ")) != nullptr) {
-  //    std::string query{query_buf};
-  //    add_history(query_buf);
-  //
-  //    free(query_buf);
-  //    ProcessQuery(db, query);
-  //  }
-  //  Dump(db, "/tmp/f");
+    auto db = Load("/tmp/f");
+    for (const auto& tbl : db.table_names()) {
+      std::cout << tbl << '\n';
+    }
+    char* query_buf;
+    while ((query_buf = readline("> ")) != nullptr) {
+      std::string query{query_buf};
+      add_history(query_buf);
+
+      free(query_buf);
+      ProcessQuery(db, query);
+    }
+//    Dump(db, "/tmp/f");
 }
 
 //  TableStorage storage1, storage2;
