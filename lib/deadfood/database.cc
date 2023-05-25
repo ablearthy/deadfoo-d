@@ -28,7 +28,11 @@ Database::Database(deadfood::storage::DBStorage& storage,
                    std::vector<core::Constraint>& constraints)
     : storage_{std::move(storage)},
       schemas_{std::move(schemas)},
-      constraints_{std::move(constraints)} {}
+      constraints_{std::move(constraints)} {
+  for (const auto& [table_name, _] : schemas_) {
+    table_names_.emplace(table_name);
+  }
+}
 
 std::vector<core::Constraint>& Database::constraints() { return constraints_; }
 
