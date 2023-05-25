@@ -91,7 +91,7 @@ void ExecuteDropTableQuery(Database& db, const std::string& table_name) {
 
 void ExecuteInsertQuery(Database& db, const InsertQuery& query) {}
 
-void ProcessQueryInternal(Database& db, const std::vector<Token> tokens) {
+void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
   if (IsKeyword(tokens[0], Keyword::Create)) {  // create table query
     const auto q = ParseCreateTableQuery(tokens);
     ExecuteCreateTableQuery(db, q);
