@@ -24,7 +24,8 @@ bool Schema::Exists(const std::string& field_name) const {
   return field_info_.contains(field_name);
 }
 
-void Schema::AddField(const std::string& field_name, const Field& field) {
+void Schema::AddField(const std::string& field_name, const Field& field,
+                      bool may_be_null, bool is_unique) {
   if (Exists(field_name)) {
     return;
   }
@@ -43,6 +44,8 @@ void Schema::AddField(const std::string& field_name, const Field& field) {
     offsets_.emplace_back(offsets_.back() + field.size());
   }
   offset_map_.emplace(field_name, offsets_.back());
+  may_be_null_.emplace(field_name, may_be_null);
+  is_unique_.emplace(field_name, is_unique);
 }
 
 size_t Schema::size() const {
@@ -52,6 +55,14 @@ size_t Schema::size() const {
   const auto last_offset = Offset(fields_.back());
   const auto last_field_size = field_info_.at(fields_.back()).size();
   return last_offset + last_field_size;
+}
+
+bool Schema::MayBeNull(const std::string& field_name) const {
+  return may_be_null_.at(field_name);
+}
+
+bool Schema::IsUnique(const std::string& field_name) const {
+  return is_unique_.at(field_name);
 }
 
 }  // namespace deadfood::core

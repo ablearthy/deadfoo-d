@@ -22,7 +22,12 @@ class Schema {
   [[nodiscard]] size_t Offset(const std::string& field_name) const;
   [[nodiscard]] bool Exists(const std::string& field_name) const;
 
-  void AddField(const std::string& field_name, const Field& field);
+  [[nodiscard]] bool MayBeNull(const std::string& field_name) const;
+  [[nodiscard]] bool IsUnique(const std::string& field_name) const;
+
+
+
+  void AddField(const std::string& field_name, const Field& field, bool may_be_null, bool is_unique);
 
  private:
   std::vector<std::string> fields_;
@@ -30,6 +35,9 @@ class Schema {
   std::map<std::string, size_t> offset_map_;
   std::map<std::string, Field> field_info_;
   std::map<std::string, size_t> indices_;
+  std::map<std::string, bool> may_be_null_;
+  std::map<std::string, bool> is_unique_;
+
   size_t data_offset_;
 };
 
