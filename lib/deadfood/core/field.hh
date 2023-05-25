@@ -21,7 +21,7 @@ class Field {
   size_t size_;
 };
 
-struct null_t{};
+struct null_t {};
 
 using FieldVariant =
     std::variant<bool, int, float, double, std::string, null_t>;
