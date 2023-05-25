@@ -1,20 +1,17 @@
 #include "math_expr.hh"
 
+#include <deadfood/util/is_number_t.hh>
+
 namespace deadfood::expr {
 MathExpr::MathExpr(MathExprOp op, std::unique_ptr<IExpr> lhs,
                    std::unique_ptr<IExpr> rhs)
     : op_{op}, lhs_{std::move(lhs)}, rhs_{std::move(rhs)} {}
 
-template <typename T>
-using IsNumberT =
-    std::disjunction<std::is_same<T, bool>, std::is_same<T, int>,
-                     std::is_same<T, float>, std::is_same<T, double>>;
-
 bool IsNumber(const core::FieldVariant& variant) {
   return std::visit(
       [](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
-        if constexpr (IsNumberT<T>::value) {
+        if constexpr (deadfood::util::IsNumberT<T>::value) {
           return true;
         }
         return false;
@@ -34,10 +31,11 @@ core::FieldVariant MathExpr::Eval() {
   if (IsNumber(lhs) && IsNumber(rhs)) {
     return std::visit(
         [&](auto&& lhs_arg) -> core::FieldVariant {
-          if constexpr (IsNumberT<std::decay_t<decltype(lhs_arg)>>::value) {
+          if constexpr (deadfood::util::IsNumberT<
+                            std::decay_t<decltype(lhs_arg)>>::value) {
             return std::visit(
                 [&](auto&& rhs_arg) -> core::FieldVariant {
-                  if constexpr (IsNumberT<
+                  if constexpr (deadfood::util::IsNumberT<
                                     std::decay_t<decltype(rhs_arg)>>::value) {
                     switch (op_) {
                       case MathExprOp::Plus:
