@@ -84,6 +84,12 @@ std::unique_ptr<scan::TableScan> Database::GetTableScan(
   return std::make_unique<scan::TableScan>(table_storage, schema, table_name);
 }
 
+std::unique_ptr<scan::TableScan> Database::GetTableScan(
+    const std::string& table_name, const std::string& rename_table) {
+  auto& schema = schemas_.at(table_name);
+  auto& table_storage = storage_.Get(table_name);
+  return std::make_unique<scan::TableScan>(table_storage, schema, rename_table);
+}
 void DumpSchemas(const std::map<std::string, core::Schema>& schemas,
                  std::ostream& stream) {
   for (const auto& [table_name, schema] : schemas) {
