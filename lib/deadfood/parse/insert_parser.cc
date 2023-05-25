@@ -26,7 +26,6 @@ query::InsertQuery ParseInsertQuery(const std::vector<lex::Token>& tokens) {
     field_names = std::vector<std::string>{};
     ++it;
     while (!lex::IsSymbol(*it, lex::Symbol::RParen)) {
-      ++it;
       util::RaiseParserErrorIf(!std::holds_alternative<lex::Identifier>(*it),
                                "expected field name");
 
