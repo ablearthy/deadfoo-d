@@ -39,13 +39,13 @@ core::FieldVariant MathExpr::Eval() {
                                     std::decay_t<decltype(rhs_arg)>>::value) {
                     switch (op_) {
                       case MathExprOp::Plus:
-                        return lhs_arg + lhs_arg;
+                        return lhs_arg + rhs_arg;
                       case MathExprOp::Minus:
-                        return lhs_arg - lhs_arg;
+                        return lhs_arg - rhs_arg;
                       case MathExprOp::Mul:
-                        return lhs_arg * lhs_arg;
+                        return lhs_arg * rhs_arg;
                       case MathExprOp::Div:
-                        return lhs_arg / lhs_arg;
+                        return lhs_arg / rhs_arg;
                     }
                   }
                   return 0;
