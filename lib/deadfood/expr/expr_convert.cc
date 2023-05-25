@@ -145,6 +145,15 @@ std::unique_ptr<IExpr> ExprTreeConverter::ConvertExprTreeToIExpr(
     const FactorTree& tree) {
   auto vis = ExprTreeConverterVisitor{get_table_scan_.get(), *this};
   auto expr = std::visit(vis, tree.factor);
-  // TODO: neg_applied, not_applied
+  if (tree.neg_applied) {
+    auto tmp = std::make_unique<MathExpr>(
+        MathExprOp::Minus, std::make_unique<ConstExpr>(0), std::move(expr));
+    expr = std::move(tmp);
+  }
+  if (tree.not_applied) {
+    auto tmp = std::make_unique<NotExpr>(std::move(expr));
+    expr = std::move(tmp);
+  }
+  return expr;
 }
 }  // namespace deadfood::expr
