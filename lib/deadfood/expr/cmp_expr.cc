@@ -76,8 +76,8 @@ core::FieldVariant CmpExpr::Eval() {
                       std::is_same_v<T, float> || std::is_same_v<T, double>) {
           return CompareTrivial(left, op_, rhs);
         } else if constexpr (std::is_same_v<T, std::span<char>>) {
-          if (std::holds_alternative<std::span<char>>(rhs)) {
-            const auto right = std::get<std::span<char>>(rhs);
+          if (std::holds_alternative<std::string>(rhs)) {
+            const auto right = std::get<std::string>(rhs);
             switch (op_) {
               case CmpOp::Eq:
                 return CompareVarcharEq(left, right);
