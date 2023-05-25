@@ -14,11 +14,14 @@
 #include <deadfood/lex/lex.hh>
 #include <deadfood/parse/create_table_parser.hh>
 #include <deadfood/parse/drop_table_parser.hh>
+#include <deadfood/parse/insert_parser.hh>
 #include <deadfood/parse/parser_error.hh>
 #include <deadfood/database.hh>
+#include <deadfood/parse/expr_tree_parser.hh>
 
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <deadfood/expr/exists_expr.hh>
 
 using namespace deadfood::core;
 using namespace deadfood::storage;
@@ -48,7 +51,45 @@ void ExecuteCreateTableQuery(
   }
 }
 
-void ExecuteDropTableQuery(Database& db, const std::string& table_name) {}
+void ExecuteDropTableQuery(Database& db, const std::string& table_name) {
+  if (!db.Exists(table_name)) {
+    throw std::runtime_error("table does not exist");
+  }
+  for (const auto& constr : db.constraints()) {
+    if (!std::holds_alternative<ReferencesConstraint>(constr)) {
+      continue;
+    }
+    const auto ref_constr = std::get<ReferencesConstraint>(constr);
+    if (ref_constr.master_table == table_name &&
+        ref_constr.on_delete == ReferencesConstraint::OnAction::NoAction) {
+      auto scan_slave = db.GetTableScan(ref_constr.slave_table);
+      auto scan_master = db.GetTableScan(ref_constr.master_table);
+
+      // EXISTS(SELECT 1 FROM master_table WHERE EXISTS(SELECT 1 FROM
+      // slave_table WHERE slave_table.slave_field = master_table.master_field))
+
+      std::unique_ptr<IExpr> cmp_fields = std::make_unique<CmpExpr>(
+          CmpOp::Eq,
+          std::make_unique<FieldExpr>(scan_slave.get(), ref_constr.slave_field),
+          std::make_unique<FieldExpr>(scan_master.get(),
+                                      ref_constr.master_field));
+      std::unique_ptr<IScan> inner_select = std::make_unique<SelectScan>(
+          std::move(scan_slave), expr::BoolExpr(std::move(cmp_fields)));
+      std::unique_ptr<IExpr> expr =
+          std::make_unique<ExistsExpr>(std::move(inner_select));
+      std::unique_ptr<IScan> select = std::make_unique<SelectScan>(
+          std::move(scan_master), expr::BoolExpr(std::move(expr)));
+
+      ExistsExpr exists(std::move(select));
+      if (std::get<bool>(exists.Eval())) {
+        throw std::runtime_error("foreign key violated");
+      }
+    }
+  }
+  db.RemoveTable(table_name);
+}
+
+void ExecuteInsertQuery(Database& db, const InsertQuery& query) {}
 
 void ProcessQueryInternal(Database& db, const std::vector<Token> tokens) {
   if (IsKeyword(tokens[0], Keyword::Create)) {  // create table query
@@ -62,7 +103,8 @@ void ProcessQueryInternal(Database& db, const std::vector<Token> tokens) {
   } else if (IsKeyword(tokens[0], Keyword::Delete)) {  // delete query
 
   } else if (IsKeyword(tokens[0], Keyword::Insert)) {  // insert query
-
+    const auto q = ParseInsertQuery(tokens);
+    ExecuteInsertQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Select)) {  // select query
 
   } else {
