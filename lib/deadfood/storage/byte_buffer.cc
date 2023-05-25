@@ -46,7 +46,7 @@ double ByteBuffer::ReadDouble(size_t offset) const {
   return tmp.d;
 }
 
-std::span<char> ByteBuffer::ReadVarchar(size_t offset, size_t count) const {
+std::string ByteBuffer::ReadVarchar(size_t offset, size_t count) const {
   return {storage_.get() + offset, count};
 }
 
