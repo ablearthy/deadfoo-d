@@ -26,6 +26,7 @@
 #include <deadfood/expr/insert_into_get_table_scan.hh>
 
 #include <deadfood/util/is_number_t.hh>
+#include <deadfood/expr/const_expr.hh>
 
 using namespace deadfood::core;
 using namespace deadfood::storage;
@@ -95,7 +96,6 @@ void ExecuteDropTableQuery(Database& db, const std::string& table_name) {
 }
 
 void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
-  // TODO: unique check
   if (!db.Exists(query.table_name)) {
     throw std::runtime_error("table does not exist");
   }
@@ -180,6 +180,7 @@ void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
             return arg;
           },
           val);
+
       actual_values_row.emplace_back(std::move(norm_val));
     }
     actual_values.emplace_back(std::move(actual_values_row));
@@ -189,6 +190,17 @@ void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
   for (const auto& row : actual_values) {
     scan->Insert();
     for (size_t i = 0; i < row.size(); ++i) {
+      if (schema.IsUnique(fields[i])) {
+        auto unique_scan = db.GetTableScan(query.table_name);
+        std::unique_ptr<IExpr> predicate = std::make_unique<CmpExpr>(
+            CmpOp::Eq, std::make_unique<ConstExpr>(row[i]),
+            std::make_unique<FieldExpr>(unique_scan.get(), fields[i]));
+        ExistsExpr exists(std::make_unique<SelectScan>(
+            std::move(unique_scan), BoolExpr(std::move(predicate))));
+        if (std::get<bool>(exists.Eval())) {
+          throw std::runtime_error("unique constraint violated");
+        }
+      }
       scan->SetField(fields[i], row[i]);
     }
   }
@@ -244,19 +256,20 @@ void ProcessQuery(Database& db, const std::string& query) {
 }
 
 int main() {
-    auto db = Load("/tmp/f");
-    for (const auto& tbl : db.table_names()) {
-      std::cout << tbl << '\n';
-    }
-    char* query_buf;
-    while ((query_buf = readline("> ")) != nullptr) {
-      std::string query{query_buf};
-      add_history(query_buf);
+  //  Database db;
+  auto db = Load("/tmp/f");
+  for (const auto& tbl : db.table_names()) {
+    std::cout << tbl << '\n';
+  }
+  char* query_buf;
+  while ((query_buf = readline("> ")) != nullptr) {
+    std::string query{query_buf};
+    add_history(query_buf);
 
-      free(query_buf);
-      ProcessQuery(db, query);
-    }
-//    Dump(db, "/tmp/f");
+    free(query_buf);
+    ProcessQuery(db, query);
+  }
+  //      Dump(db, "/tmp/f");
 }
 
 //  TableStorage storage1, storage2;
