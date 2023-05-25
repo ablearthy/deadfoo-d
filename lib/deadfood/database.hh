@@ -33,6 +33,8 @@ class Database {
   void RemoveTable(const std::string& table_name);
 
   std::unique_ptr<scan::TableScan> GetTableScan(const std::string& table_name);
+  std::unique_ptr<scan::TableScan> GetTableScan(
+      const std::string& table_name, const std::string& rename_table);
 
  private:
   storage::DBStorage storage_;
