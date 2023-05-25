@@ -160,7 +160,7 @@ std::optional<expr::GenBinOp> ParseOp(It& it, const It end) {
   } else if (lex::IsSymbol(*it, lex::Symbol::Plus)) {
     ++it;
     return expr::GenBinOp::Plus;
-  } else if (lex::IsSymbol(*it, lex::Symbol::Plus)) {
+  } else if (lex::IsSymbol(*it, lex::Symbol::Minus)) {
     ++it;
     return expr::GenBinOp::Minus;
   } else if (lex::IsKeyword(*it, lex::Keyword::And)) {
