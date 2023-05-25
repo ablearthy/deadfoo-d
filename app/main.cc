@@ -22,6 +22,10 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <deadfood/expr/exists_expr.hh>
+#include <deadfood/expr/expr_convert.hh>
+#include <deadfood/expr/insert_into_get_table_scan.hh>
+
+#include <deadfood/util/is_number_t.hh>
 
 using namespace deadfood::core;
 using namespace deadfood::storage;
@@ -100,7 +104,91 @@ void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
     std::set<std::string> query_fields{query.fields->begin(),
                                        query.fields->end()};
     for (const auto& field : schema.fields()) {
-      const auto& info = schema.field_info(field);
+      if (!schema.MayBeNull(field) && !query_fields.contains(field)) {
+        throw std::runtime_error("specify " + field + " field");
+      }
+    }
+  }
+
+  const auto schema = db.schemas().at(query.table_name);
+  std::vector<std::string> fields;
+  if (query.fields.has_value()) {
+    fields = query.fields.value();
+  } else {
+    fields = schema.fields();
+  }
+  for (const auto& row : query.values) {
+    if (row.size() != fields.size()) {
+      throw std::runtime_error("got invalid rows");
+    }
+  }
+
+  ExprTreeConverter converter{std::make_unique<InsertIntoGetTableScan>()};
+  std::vector<std::vector<core::FieldVariant>> actual_values;
+  for (const auto& row : query.values) {
+    if (row.size() != fields.size()) {
+      throw std::runtime_error("got invalid rows");
+    }
+    std::vector<core::FieldVariant> actual_values_row;
+    for (size_t i = 0; i < row.size(); ++i) {
+      auto e = converter.ConvertExprTreeToIExpr(row[i]);
+      auto val = e->Eval();
+      std::visit(
+          [&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, core::null_t>) {
+              if (!schema.MayBeNull(fields[i])) {
+                throw std::runtime_error("passed null to non-null field");
+              }
+            } else if constexpr (deadfood::util::IsNumberT<T>::value) {
+              const auto info = schema.field_info(fields[i]);
+              if (info.type() == core::Field::FieldType::Varchar) {
+                throw std::runtime_error("cannot convert number into string");
+              }
+            } else if constexpr (std::is_same_v<T, std::string>) {
+              const auto info = schema.field_info(fields[i]);
+              if (info.type() != core::Field::FieldType::Varchar) {
+                throw std::runtime_error(
+                    "cannot convert string into non-string");
+              }
+              if (info.size() < arg.size()) {
+                throw std::runtime_error("the string is too large");
+              }
+            }
+          },
+          val);
+      auto norm_val = std::visit(
+          [&](auto&& arg) -> core::FieldVariant {
+            using T = std::decay_t<decltype(arg)>;
+
+            if constexpr (deadfood::util::IsNumberT<T>::value) {
+              const auto info = schema.field_info(fields[i]);
+              switch (info.type()) {
+                case Field::FieldType::Bool:
+                  return static_cast<bool>(arg);
+                case Field::FieldType::Int:
+                  return static_cast<int>(arg);
+                case Field::FieldType::Float:
+                  return static_cast<float>(arg);
+                case Field::FieldType::Double:
+                  return static_cast<double>(arg);
+                case Field::FieldType::Varchar:
+                  throw std::runtime_error("cannot convert number into string");
+              }
+            }
+            return arg;
+          },
+          val);
+      actual_values_row.emplace_back(std::move(norm_val));
+    }
+    actual_values.emplace_back(std::move(actual_values_row));
+  }
+  auto scan = db.GetTableScan(query.table_name);
+  scan->BeforeFirst();
+  for (const auto& row : actual_values) {
+    scan->Insert();
+    for (size_t i = 0; i < row.size(); ++i) {
+      scan->SetField(fields[i], row[i]);
     }
   }
 }
@@ -150,16 +238,21 @@ void ProcessQuery(Database& db, const std::string& query) {
 }
 
 int main() {
-  Database db;
-
-  char* query_buf;
-  while ((query_buf = readline("> ")) != nullptr) {
-    std::string query{query_buf};
-    add_history(query_buf);
-
-    free(query_buf);
-    ProcessQuery(db, query);
-  }
+  auto x = 12 * 1.3;
+  //  auto db = Load("/tmp/f");
+  //  for (const auto& tbl : db.table_names()) {
+  //    std::cout << tbl << '\n';
+  //  }
+  //  Database db;
+  //  char* query_buf;
+  //  while ((query_buf = readline("> ")) != nullptr) {
+  //    std::string query{query_buf};
+  //    add_history(query_buf);
+  //
+  //    free(query_buf);
+  //    ProcessQuery(db, query);
+  //  }
+  //  Dump(db, "/tmp/f");
 }
 
 //  TableStorage storage1, storage2;
