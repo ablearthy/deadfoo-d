@@ -30,6 +30,9 @@ bool TableScan::Next() {
   if (before_start_) {
     before_start_ = false;
     it_ = storage_.storage().begin();
+    if (it_ == storage_.storage().end()) {
+      return false;
+    }
     return true;
   }
 
