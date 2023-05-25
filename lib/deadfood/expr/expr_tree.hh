@@ -7,7 +7,7 @@
 
 namespace deadfood::expr {
 
-enum class GenBinOp { Or, And, Xor, Plus, Minus, Mul, Div, Eq, LT, LE, GE, GT, Is };
+enum class GenBinOp { Or, And, Xor, Plus, Minus, Mul, Div, Eq, LT, LE, GE, GT, Is, IsNot };
 
 using Constant = std::variant<int, double, std::string, bool, core::null_t>;
 

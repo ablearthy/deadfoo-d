@@ -107,7 +107,8 @@ static const std::vector<std::vector<expr::GenBinOp>> kPrecedence = {
     {expr::GenBinOp::Or},
     {expr::GenBinOp::Xor},
     {expr::GenBinOp::LE, expr::GenBinOp::GE, expr::GenBinOp::GT,
-     expr::GenBinOp::LT, expr::GenBinOp::Eq, expr::GenBinOp::Is},
+     expr::GenBinOp::LT, expr::GenBinOp::Eq, expr::GenBinOp::Is,
+     expr::GenBinOp::IsNot},
     {expr::GenBinOp::Plus, expr::GenBinOp::Minus},
     {expr::GenBinOp::Mul, expr::GenBinOp::Div}};
 
@@ -136,6 +137,17 @@ std::optional<expr::GenBinOp> ParseOp(It& it, const It end) {
     } else {
       return expr::GenBinOp::GT;
     }
+  } else if (lex::IsKeyword(*it, lex::Keyword::Is)) {
+    ++it;
+    if (it == end) {
+      throw ParserError("unexpected end");
+    }
+    if (lex::IsKeyword(*it, lex::Keyword::Not)) {
+      ++it;
+      return expr::GenBinOp::IsNot;
+    } else {
+      return expr::GenBinOp::Is;
+    }
   } else if (lex::IsSymbol(*it, lex::Symbol::Eq)) {
     ++it;
     return expr::GenBinOp::Eq;
@@ -160,9 +172,6 @@ std::optional<expr::GenBinOp> ParseOp(It& it, const It end) {
   } else if (lex::IsKeyword(*it, lex::Keyword::Xor)) {
     ++it;
     return expr::GenBinOp::Xor;
-  } else if (lex::IsKeyword(*it, lex::Keyword::Is)) {
-    ++it;
-    return expr::GenBinOp::Is;
   }
   return std::nullopt;
 }
