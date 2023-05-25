@@ -107,7 +107,7 @@ static const std::vector<std::vector<expr::GenBinOp>> kPrecedence = {
     {expr::GenBinOp::Or},
     {expr::GenBinOp::Xor},
     {expr::GenBinOp::LE, expr::GenBinOp::GE, expr::GenBinOp::GT,
-     expr::GenBinOp::LT, expr::GenBinOp::Eq},
+     expr::GenBinOp::LT, expr::GenBinOp::Eq, expr::GenBinOp::Is},
     {expr::GenBinOp::Plus, expr::GenBinOp::Minus},
     {expr::GenBinOp::Mul, expr::GenBinOp::Div}};
 
@@ -160,6 +160,9 @@ std::optional<expr::GenBinOp> ParseOp(It& it, const It end) {
   } else if (lex::IsKeyword(*it, lex::Keyword::Xor)) {
     ++it;
     return expr::GenBinOp::Xor;
+  } else if (lex::IsKeyword(*it, lex::Keyword::Is)) {
+    ++it;
+    return expr::GenBinOp::Is;
   }
   return std::nullopt;
 }

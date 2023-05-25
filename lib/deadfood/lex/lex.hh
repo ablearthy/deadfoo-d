@@ -47,7 +47,8 @@ enum class Keyword {
   References,
   Unique,
   Not,
-  Drop
+  Drop,
+  Is
 };
 
 static std::map<std::string, Keyword> kKeywordLiteralToKeyword = {
@@ -66,7 +67,7 @@ static std::map<std::string, Keyword> kKeywordLiteralToKeyword = {
     {"primary", Keyword::Primary}, {"foreign", Keyword::Foreign},
     {"key", Keyword::Key},         {"references", Keyword::References},
     {"unique", Keyword::Unique},   {"not", Keyword::Not},
-    {"drop", Keyword::Drop}};
+    {"drop", Keyword::Drop},       {"is", Keyword::Is}};
 
 enum class Symbol {
   LParen,
