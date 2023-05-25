@@ -32,12 +32,13 @@ bool CompareTrivial(L left, CmpOp op, const core::FieldVariant& rhs) {
               return left < right;
           }
         }
+        throw std::runtime_error("cannot compare number and not number");
         return false;
       },
       rhs);
 }
 
-bool CompareVarcharEq(std::span<char> left, std::span<char> right) {
+bool CompareVarcharEq(const std::string& left, const std::string& right) {
   if (left.size() != right.size()) {
     return false;
   }
@@ -51,7 +52,7 @@ bool CompareVarcharEq(std::span<char> left, std::span<char> right) {
   return true;
 }
 
-bool CompareVarcharLe(std::span<char> left, std::span<char> right) {
+bool CompareVarcharLe(const std::string& left, const std::string& right) {
   if (left.size() > right.size()) {
     return false;
   }
@@ -75,7 +76,7 @@ core::FieldVariant CmpExpr::Eval() {
         if constexpr (std::is_same_v<T, bool> || std::is_same_v<T, int> ||
                       std::is_same_v<T, float> || std::is_same_v<T, double>) {
           return CompareTrivial(left, op_, rhs);
-        } else if constexpr (std::is_same_v<T, std::span<char>>) {
+        } else if constexpr (std::is_same_v<T, std::string>) {
           if (std::holds_alternative<std::string>(rhs)) {
             const auto right = std::get<std::string>(rhs);
             switch (op_) {
@@ -85,6 +86,7 @@ core::FieldVariant CmpExpr::Eval() {
                 return CompareVarcharLe(left, right);
             }
           }
+          throw std::runtime_error("cannot compare string and not string");
           return false;
         } else if constexpr (std::is_same_v<T, core::null_t>) {
           return std::holds_alternative<core::null_t>(rhs);
