@@ -24,7 +24,7 @@ class Field {
 struct null_t{};
 
 using FieldVariant =
-    std::variant<bool, int, float, double, std::span<char>, null_t>;
+    std::variant<bool, int, float, double, std::string, null_t>;
 
 namespace field {
 

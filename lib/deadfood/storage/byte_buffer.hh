@@ -20,7 +20,7 @@ class ByteBuffer {
   [[nodiscard]] int ReadInt(size_t offset) const;
   [[nodiscard]] float ReadFloat(size_t offset) const;
   [[nodiscard]] double ReadDouble(size_t offset) const;
-  [[nodiscard]] std::span<char> ReadVarchar(size_t offset, size_t count) const;
+  [[nodiscard]] std::string ReadVarchar(size_t offset, size_t count) const;
 
   void WriteByte(size_t offset, char value);
   void WriteBool(size_t offset, bool value);
