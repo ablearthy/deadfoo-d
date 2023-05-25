@@ -52,7 +52,7 @@ Token ParseNumber(std::string_view& input) {
   return static_cast<double>(integral_part) + frac_part;
 }
 
-std::string ParseString(std::string_view input) {
+std::string ParseString(std::string_view& input) {
   input.remove_prefix(1);  // consume `'`
   std::string ret;
 
@@ -84,6 +84,11 @@ std::string ParseString(std::string_view input) {
       ret += input[0];
       input.remove_prefix(1);
     }
+  }
+  if (input.empty()) {
+    throw std::runtime_error("expected closing quote");
+  } else {
+    input.remove_prefix(1);
   }
 
   return ret;
