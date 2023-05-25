@@ -14,6 +14,9 @@ void SelectScan::BeforeFirst() { internal_->BeforeFirst(); }
 bool SelectScan::Next() {
   while (internal_->Next()) {
     const auto v = predicate_.Eval();
+    if (std::holds_alternative<core::null_t>(v)) {
+      continue;
+    }
     if (!std::get<bool>(v)) {
       continue;
     }
@@ -35,16 +38,10 @@ void SelectScan::SetField(const std::string& field_name,
   return internal_->SetField(field_name, value);
 }
 
-void SelectScan::Insert() {
-  return internal_->Insert();
-}
+void SelectScan::Insert() { return internal_->Insert(); }
 
-void SelectScan::Delete() {
-  return internal_->Delete();
-}
+void SelectScan::Delete() { return internal_->Delete(); }
 
-void SelectScan::Close() {
-  return internal_->Close();
-}
+void SelectScan::Close() { return internal_->Close(); }
 
 }  // namespace deadfood::scan
