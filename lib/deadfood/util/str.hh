@@ -13,7 +13,7 @@ template <typename T>
 inline std::basic_string<T> lowercase(const std::basic_string<T>& s) {
   std::basic_string<T> s2 = s;
   std::transform(s2.begin(), s2.end(), s2.begin(), [](const T v) {
-    return static_cast<T>(std::tolower(static_cast<uint8_t>(v)));
+    return static_cast<T>(std::tolower(static_cast<unsigned char>(v)));
   });
   return s2;
 }
