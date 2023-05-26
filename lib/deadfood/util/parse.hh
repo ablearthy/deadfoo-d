@@ -42,4 +42,8 @@ inline void RaiseParserErrorIf(bool b, const std::string& message) {
   }
 }
 
+inline bool IsIdentifier(const lex::Token& token) {
+  return std::holds_alternative<lex::Identifier>(token);
+}
+
 }  // namespace deadfood::parse::util
