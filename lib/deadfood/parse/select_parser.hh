@@ -66,6 +66,36 @@ query::Selector ParseSelector(It& it, const It end) {
                               .field_name = std::move(field_name)};
 }
 
+template <std::forward_iterator It>
+query::SelectFrom ParseSource(It& it, const It end) {
+  if (lex::IsSymbol(*it, lex::Symbol::LParen)) {
+    ++it;
+    auto ret = ParseSelectQuery(it, end);
+    util::ExpectSymbol(it, end, lex::Symbol::RParen, "expected `)`");
+    ++it;
+    return ret;
+  }
+  if (const auto* id = std::get_if<lex::Identifier>(&*it)) {
+    ++it;
+    if (deadfood::util::ContainsDot(id->id)) {
+      throw ParserError("invalid name of table");
+    }
+    if (it == end || !lex::IsKeyword(*it, lex::Keyword::As)) {
+      return query::FromTable{.table_name = id->id, .renamed = std::nullopt};
+    }
+    ++it;
+    if (it == end || !util::IsIdentifier(*it)) {
+      throw ParserError("alias should be valid");
+    }
+    auto rename_id = std::get<lex::Identifier>(*it);
+    if (deadfood::util::ContainsDot(rename_id.id)) {
+      throw ParserError("alias should not contain `.`");
+    }
+    return query::FromTable{.table_name = id->id, .renamed = rename_id.id};
+  }
+  throw ParserError("expected either (SELECT ...) expression or table name");
+}
+
 }  // namespace
 
 template <std::forward_iterator It>
@@ -99,7 +129,11 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
           break;
         }
       }
-      // TODO: parse sources
+      auto source = ParseSource(it, end);
+      ret.sources.emplace_back(std::move(source));
+      if (it != end && lex::IsSymbol(*it, lex::Symbol::Comma)) {
+        ++it;
+      }
     }
 
     if (it == end) {
