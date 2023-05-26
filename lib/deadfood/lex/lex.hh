@@ -14,7 +14,7 @@ static const std::set<std::string> kKeywords = {
     "insert",  "into",    "values",  "delete",     "update", "set",
     "create",  "table",   "boolean", "int",        "float",  "double",
     "varchar", "as",      "join",    "on",         "exists", "null",
-    "primary", "foreign", "key",     "references", "unique", "not"};
+    "primary", "foreign", "key",     "references", "unique", "not", "drop"};
 
 enum class Keyword {
   Select,
