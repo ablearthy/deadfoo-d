@@ -23,53 +23,47 @@ core::FieldVariant MathExpr::Eval() {
   auto lhs = lhs_->Eval();
   auto rhs = rhs_->Eval();
 
-  if (std::holds_alternative<core::null_t>(lhs) ||
-      std::holds_alternative<core::null_t>(rhs)) {
-    return core::null_t{};
-  }
-
-  if (IsNumber(lhs) && IsNumber(rhs)) {
-    return std::visit(
-        [&](auto&& lhs_arg) -> core::FieldVariant {
-          if constexpr (deadfood::util::IsNumberT<
-                            std::decay_t<decltype(lhs_arg)>>::value) {
-            return std::visit(
-                [&](auto&& rhs_arg) -> core::FieldVariant {
-                  if constexpr (deadfood::util::IsNumberT<
-                                    std::decay_t<decltype(rhs_arg)>>::value) {
-                    switch (op_) {
-                      case MathExprOp::Plus:
-                        return lhs_arg + rhs_arg;
-                      case MathExprOp::Minus:
-                        return lhs_arg - rhs_arg;
-                      case MathExprOp::Mul:
-                        return lhs_arg * rhs_arg;
-                      case MathExprOp::Div:
-                        return lhs_arg / rhs_arg;
-                    }
-                  }
-                  return 0;
-                },
-                rhs);
-          }
-          return 0;
-        },
-        lhs);
-  }
-
-  switch (op_) {
-    case MathExprOp::Plus:
-      if (std::holds_alternative<std::string>(lhs) &&
-          std::holds_alternative<std::string>(rhs)) {
-        return std::get<std::string>(lhs) + std::get<std::string>(rhs);
-      }
-      throw std::runtime_error("cannot perform `+` operation");
-    case MathExprOp::Minus:
-      throw std::runtime_error("cannot perform `-` operation");
-    case MathExprOp::Mul:
-      throw std::runtime_error("cannot perform `*` operation");
-    case MathExprOp::Div:
-      throw std::runtime_error("cannot perform `/` operation");
-  }
+  return std::visit(
+      [&](auto&& lhs_arg) -> core::FieldVariant {
+        using L = std::decay_t<decltype(lhs_arg)>;
+        return std::visit(
+            [&](auto&& rhs_arg) -> core::FieldVariant {
+              using R = std::decay_t<decltype(rhs_arg)>;
+              if constexpr (std::is_same_v<L, core::null_t> ||
+                            std::is_same_v<R, core::null_t>) {
+                return core::null_t{};
+              } else if constexpr (deadfood::util::IsNumberT<L>::value &&
+                                   deadfood::util::IsNumberT<R>::value) {
+                switch (op_) {
+                  case MathExprOp::Plus:
+                    return lhs_arg + rhs_arg;
+                  case MathExprOp::Minus:
+                    return lhs_arg - rhs_arg;
+                  case MathExprOp::Mul:
+                    return lhs_arg * rhs_arg;
+                  case MathExprOp::Div:
+                    return lhs_arg / rhs_arg;
+                }
+              } else if constexpr (std::is_same_v<L, std::string> &&
+                                   std::is_same_v<R, std::string>) {
+                switch (op_) {
+                  case MathExprOp::Plus:
+                    return lhs_arg + rhs_arg;
+                  case MathExprOp::Minus:
+                    throw std::runtime_error(
+                        "cannot perform `-` operation on strings");
+                  case MathExprOp::Mul:
+                    throw std::runtime_error(
+                        "cannot perform `*` operation on strings");
+                  case MathExprOp::Div:
+                    throw std::runtime_error(
+                        "cannot perform `/` operation on strings");
+                }
+              }
+              throw std::runtime_error("cannot perform operation");
+            },
+            rhs);
+      },
+      lhs);
 }
 }  // namespace deadfood::expr
