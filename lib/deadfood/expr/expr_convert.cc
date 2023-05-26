@@ -48,56 +48,42 @@ struct ExprTreeConverterVisitor {
         return GetMathExpr(expr.factors, MathExprOp::Div);
       case GenBinOp::Eq:
         RaiseIfNotBinFactors(expr.factors);
-        return std::make_unique<CmpExpr>(
-            CmpOp::Eq,
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1]));
+        return GetTrivialCmpExpr(expr.factors, CmpOp::Eq, 0, 1);
       case GenBinOp::LT:
         RaiseIfNotBinFactors(expr.factors);
-        return std::make_unique<CmpExpr>(
-            CmpOp::Le,
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1]));
-      case GenBinOp::LE:
-        RaiseIfNotBinFactors(expr.factors);
-        return std::make_unique<BinBoolExpr>(
-            BinBoolOp::Or,
-            std::make_unique<CmpExpr>(
-                CmpOp::Le,
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1])),
-            std::make_unique<CmpExpr>(
-                CmpOp::Eq,
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1])));
-      case GenBinOp::GE:
-        RaiseIfNotBinFactors(expr.factors);
-        return std::make_unique<BinBoolExpr>(
-            BinBoolOp::Or,
-            std::make_unique<CmpExpr>(
-                CmpOp::Le,
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1]),
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0])),
-            std::make_unique<CmpExpr>(
-                CmpOp::Eq,
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
-                expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1])));
+        return GetTrivialCmpExpr(expr.factors, CmpOp::Le, 0, 1);
       case GenBinOp::GT:
         RaiseIfNotBinFactors(expr.factors);
-        return std::make_unique<CmpExpr>(
-            CmpOp::Le,
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1]),
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]));
-      case GenBinOp::Is:
+        return GetTrivialCmpExpr(expr.factors, CmpOp::Le, 1, 0);
+      case GenBinOp::LE:
+      case GenBinOp::GE:
         RaiseIfNotBinFactors(expr.factors);
-        return std::make_unique<IsExpr>(
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1]));
+        {
+          auto conv = [&](size_t idx) {
+            return expr_tree_converter.ConvertExprTreeToIExpr(
+                expr.factors[idx]);
+          };
+          const size_t left_idx = expr.op == GenBinOp::LE ? 0 : 1;
+          const size_t right_idx = expr.op == GenBinOp::LE ? 1 : 0;
+          return std::make_unique<BinBoolExpr>(
+              BinBoolOp::Or,
+              std::make_unique<CmpExpr>(CmpOp::Le, conv(left_idx),
+                                        conv(right_idx)),
+              std::make_unique<CmpExpr>(CmpOp::Eq, conv(left_idx),
+                                        conv(right_idx)));
+        }
+      case GenBinOp::Is:
       case GenBinOp::IsNot:
         RaiseIfNotBinFactors(expr.factors);
-        return std::make_unique<NotExpr>(std::make_unique<IsExpr>(
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
-            expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1])));
+        {
+          auto ret = std::make_unique<IsExpr>(
+              expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[0]),
+              expr_tree_converter.ConvertExprTreeToIExpr(expr.factors[1]));
+          if (expr.op == GenBinOp::IsNot) {
+            return std::make_unique<NotExpr>(std::move(ret));
+          }
+          return ret;
+        }
     }
   }
 
@@ -138,6 +124,14 @@ struct ExprTreeConverterVisitor {
       ret = std::move(tmp);
     }
     return ret;
+  }
+
+  std::unique_ptr<IExpr> GetTrivialCmpExpr(
+      const std::vector<FactorTree>& factors, CmpOp op, size_t lhs_idx,
+      size_t rhs_idx) {
+    return std::make_unique<CmpExpr>(
+        op, expr_tree_converter.ConvertExprTreeToIExpr(factors[lhs_idx]),
+        expr_tree_converter.ConvertExprTreeToIExpr(factors[rhs_idx]));
   }
 };
 
