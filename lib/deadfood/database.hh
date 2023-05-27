@@ -32,8 +32,8 @@ class Database {
   void AddTable(const std::string& table_name, const core::Schema& schema);
   void RemoveTable(const std::string& table_name);
 
-  std::unique_ptr<scan::TableScan> GetTableScan(const std::string& table_name);
-  std::unique_ptr<scan::TableScan> GetTableScan(
+  std::unique_ptr<scan::IScan> GetTableScan(const std::string& table_name);
+  std::unique_ptr<scan::IScan> GetTableScan(
       const std::string& table_name, const std::string& rename_table);
 
  private:
