@@ -27,6 +27,9 @@
 
 #include <deadfood/util/is_number_t.hh>
 #include <deadfood/expr/const_expr.hh>
+#include <deadfood/parse/select_parser.hh>
+#include <deadfood/exec/select/find_table_by_field.hh>
+#include <deadfood/scan/extend_scan.hh>
 
 using namespace deadfood::core;
 using namespace deadfood::storage;
@@ -35,6 +38,7 @@ using namespace deadfood::expr;
 using namespace deadfood::lex;
 using namespace deadfood::parse;
 using namespace deadfood::query;
+using namespace deadfood::exec;
 using namespace deadfood;
 
 void ExecuteCreateTableQuery(
@@ -206,6 +210,172 @@ void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
   }
 }
 
+std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
+                                              const query::SelectQuery& query);
+
+std::unique_ptr<IScan> GetScanFromSource(Database& db,
+                                         const query::SelectFrom& from) {
+  return std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, SelectQuery>) {
+          return GetScanFromSelectQuery(db, arg);
+        } else if constexpr (std::is_same_v<T, FromTable>) {
+          if (arg.renamed.has_value()) {
+            return db.GetTableScan(arg.table_name, arg.renamed.value());
+          } else {
+            return db.GetTableScan(arg.table_name);
+          }
+        }
+      },
+      from);
+}
+
+class SelectFromGetTableScan : public GetTableScan {
+ public:
+  SelectFromGetTableScan(IScan* internal) : internal_{internal} {}
+
+  IScan* GetScan(const std::string& field_name) override { return internal_; }
+
+ private:
+  IScan* internal_;
+};
+
+std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
+                                              const query::SelectQuery& query) {
+  auto scan = GetScanFromSource(db, query.sources[0]);
+  for (size_t i = 1; i < query.sources.size(); ++i) {
+    std::unique_ptr<IScan> tmp = std::make_unique<ProductScan>(
+        GetScanFromSource(db, query.sources[i]), std::move(scan));
+    scan = std::move(tmp);
+  }
+
+  for (const auto& join : query.joins) {
+    // TODO: left & right join support
+    std::unique_ptr<IScan> tmp = std::make_unique<ProductScan>(
+        db.GetTableScan(join.table_name, join.alias), std::move(scan));
+
+    std::string lhs_field_name =
+        join.table_name_lhs + "." + join.field_name_lhs;
+    std::string rhs_field_name =
+        join.table_name_rhs + "." + join.field_name_rhs;
+    scan = std::make_unique<SelectScan>(
+        std::move(tmp),
+        expr::BoolExpr(std::make_unique<CmpExpr>(
+            CmpOp::Eq, std::make_unique<FieldExpr>(tmp.get(), lhs_field_name),
+            std::make_unique<FieldExpr>(tmp.get(), rhs_field_name))));
+  }
+
+  for (const auto& selector : query.selectors) {
+    if (auto s = std::get_if<FieldSelector>(&selector)) {
+      ExprTreeConverter converter{
+          std::make_unique<SelectFromGetTableScan>(scan.get())};
+
+      scan = std::make_unique<ExtendScan>(
+          std::move(scan), converter.ConvertExprTreeToIExpr(s->expr),
+          s->field_name);
+    }
+  }
+
+  if (query.predicate.has_value()) {
+    ExprTreeConverter converter{
+        std::make_unique<SelectFromGetTableScan>(scan.get())};
+    scan = std::make_unique<SelectScan>(
+        std::move(scan), expr::BoolExpr(converter.ConvertExprTreeToIExpr(
+                             query.predicate.value())));
+  }
+
+  return scan;
+}
+
+std::vector<std::string> ObtainAllFields(Database& db,
+                                         const query::SelectFrom& from) {
+  std::vector<std::string> ret;
+  std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, FromTable>) {
+          const auto& schema = db.schemas().at(arg.table_name);
+          std::string table_name =
+              arg.renamed.has_value() ? arg.renamed.value() : arg.table_name;
+          table_name += '.';
+          for (const auto& field_name : schema.fields()) {
+            ret.emplace_back(table_name + field_name);
+          }
+        } else if constexpr (std::is_same_v<T, SelectQuery>) {
+          for (auto& source : arg.sources) {
+            const auto inner_fields = ObtainAllFields(db, source);
+            ret.insert(ret.end(), inner_fields.begin(), inner_fields.end());
+          }
+        }
+      },
+      from);
+  return ret;
+}
+
+void ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
+  auto scan = GetScanFromSelectQuery(db, query);
+
+  std::vector<std::string> fields;
+
+  for (const auto& selector : query.selectors) {
+    std::visit(
+        [&](auto&& arg) {
+          using T = std::decay_t<decltype(arg)>;
+          if constexpr (std::is_same_v<T, SelectAllSelector>) {
+            for (const auto& source : query.sources) {
+              const auto inner_fields = ObtainAllFields(db, source);
+              fields.insert(fields.end(), inner_fields.begin(),
+                            inner_fields.end());
+            }
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            if (const auto c = FindTableByField(db.schemas(), query, arg)) {
+              fields.emplace_back(c->full_field_name);
+            } else {
+              fields.emplace_back(arg);
+            }
+          } else if constexpr (std::is_same_v<T, FieldSelector>) {
+            if (FindTableByField(db.schemas(), query, arg.field_name)
+                    .has_value()) {
+              throw std::runtime_error("ambiguous source for `" +
+                                       arg.field_name + "` field");
+            }
+            fields.emplace_back(arg.field_name);
+          }
+        },
+        selector);
+  }
+  scan->BeforeFirst();
+  for (size_t i = 0; i < fields.size(); ++i) {
+    std::cout << fields[i];
+    if (i != fields.size() - 1) {
+      std::cout << '|';
+    }
+  }
+  std::cout << '\n';
+  while (scan->Next()) {
+    for (size_t i = 0; i < fields.size(); ++i) {
+      const auto value = scan->GetField(fields[i]);
+      std::visit(
+          [&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, core::null_t>) {
+              std::cout << "NULL";
+            } else if constexpr (std::is_same_v<T, std::string>) {
+              std::cout << '\'' << arg << '\'';  // TODO: handle \n...
+            } else {
+              std::cout << arg;
+            }
+          },
+          value);
+      if (i != fields.size() - 1) {
+        std::cout << '|';
+      }
+    }
+    std::cout << '\n';
+  }
+}
+
 void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
   if (IsKeyword(tokens[0], Keyword::Create)) {  // create table query
     const auto q = ParseCreateTableQuery(tokens);
@@ -221,12 +391,8 @@ void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
     const auto q = ParseInsertQuery(tokens);
     ExecuteInsertQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Select)) {  // select query
-    auto scan = db.GetTableScan("test_tbl");
-    scan->BeforeFirst();
-    while (scan->Next()) {
-      std::cout << std::get<int>(scan->GetField("a")) << ' '
-                << std::get<int>(scan->GetField("b")) << '\n';
-    }
+    const auto q = ParseSelectQuery(tokens);
+    ExecuteSelectQuery(db, q);
   } else {
     std::cout << "unknown query\n";
     return;
@@ -256,11 +422,11 @@ void ProcessQuery(Database& db, const std::string& query) {
 }
 
 int main() {
-  //  Database db;
-  auto db = Load("/tmp/f");
-  for (const auto& tbl : db.table_names()) {
-    std::cout << tbl << '\n';
-  }
+  Database db;
+  //  auto db = Load("/tmp/f");
+  //  for (const auto& tbl : db.table_names()) {
+  //    std::cout << tbl << '\n';
+  //  }
   char* query_buf;
   while ((query_buf = readline("> ")) != nullptr) {
     std::string query{query_buf};
