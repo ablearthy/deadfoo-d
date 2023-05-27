@@ -20,6 +20,8 @@ enum class JoinType { Left, Right, Inner };
 
 struct Join {
   JoinType type;
+  std::string table_name;
+  std::string alias;
   std::string table_name_lhs;
   std::string field_name_lhs;
   std::string table_name_rhs;
