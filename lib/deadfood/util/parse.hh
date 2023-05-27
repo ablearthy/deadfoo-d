@@ -46,4 +46,13 @@ inline bool IsIdentifier(const lex::Token& token) {
   return std::holds_alternative<lex::Identifier>(token);
 }
 
+template <typename It>
+inline std::string ExpectIdentifier(const It& it, const It end) {
+  ExpectNotEnd(it, end);
+  if (auto id = std::get_if<deadfood::lex::Identifier>(&*it)) {
+    return id->id;
+  }
+  throw ParserError("expected identifier");
+}
+
 }  // namespace deadfood::parse::util
