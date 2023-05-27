@@ -91,6 +91,7 @@ query::SelectFrom ParseSource(It& it, const It end) {
     if (deadfood::util::ContainsDot(rename_id.id)) {
       throw ParserError("alias should not contain `.`");
     }
+    ++it;
     return query::FromTable{.table_name = id->id, .renamed = rename_id.id};
   }
   throw ParserError("expected either (SELECT ...) expression or table name");
@@ -103,8 +104,9 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
   query::SelectQuery ret;
   util::ExpectKeyword(it, end, lex::Keyword::Select, "expected `SELECT`");
   ++it;
-  while (it != end || !(lex::IsKeyword(*it, lex::Keyword::From) ||
-                        lex::IsKeyword(*it, lex::Keyword::Where))) {
+  while (it != end && !lex::IsSymbol(*it, lex::Symbol::RParen) &&
+         !lex::IsKeyword(*it, lex::Keyword::From) &&
+         !lex::IsKeyword(*it, lex::Keyword::Where)) {
     auto selector = ParseSelector(it, end);
     ret.selectors.emplace_back(std::move(selector));
     if (it != end && lex::IsSymbol(*it, lex::Symbol::Comma)) {
@@ -122,7 +124,7 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
 
   if (lex::IsKeyword(*it, lex::Keyword::From)) {
     ++it;
-    while (it != end || !lex::IsKeyword(*it, lex::Keyword::Where)) {
+    while (it != end && !lex::IsKeyword(*it, lex::Keyword::Where)) {
       {
         std::forward_iterator auto copy_it = it;
         if (ParseJoinType(copy_it, end).has_value()) {
@@ -140,8 +142,39 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
       return ret;
     }
 
-    if (auto join_type = ParseJoinType(it, end)) {
-      // TODO: parse joins
+    while (auto join_type = ParseJoinType(it, end)) {
+      if (!std::holds_alternative<lex::Identifier>(*it)) {
+        throw ParserError("expected table name");
+      }
+      const auto [id] = std::get<lex::Identifier>(*it);
+      if (deadfood::util::ContainsDot(id)) {
+        throw ParserError("invalid table name");
+      }
+      ++it;
+
+      util::ExpectKeyword(it, end, lex::Keyword::On, "expected `ON`");
+      ++it;
+      auto lhs = util::ExpectIdentifier(it, end);
+      ++it;
+      util::ExpectSymbol(it, end, lex::Symbol::Eq, "expected `=`");
+      ++it;
+      auto rhs = util::ExpectIdentifier(it, end);
+      ++it;
+
+      auto maybe_split_left = deadfood::util::SplitOnDot(lhs);
+      auto maybe_split_right = deadfood::util::SplitOnDot(rhs);
+      if (!maybe_split_left.has_value() || !maybe_split_right.has_value() ||
+          maybe_split_left->first.empty() || maybe_split_left->second.empty() ||
+          maybe_split_right->first.empty() ||
+          maybe_split_right->second.empty()) {
+        throw ParserError("invalid tables");
+      }
+      ret.joins.emplace_back(
+          query::Join{.type = join_type.value(),
+                      .table_name_lhs = maybe_split_left->first,
+                      .field_name_lhs = maybe_split_left->second,
+                      .table_name_rhs = maybe_split_right->first,
+                      .field_name_rhs = maybe_split_right->second});
     }
   }
 
