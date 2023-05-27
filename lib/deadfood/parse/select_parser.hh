@@ -124,7 +124,8 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
 
   if (lex::IsKeyword(*it, lex::Keyword::From)) {
     ++it;
-    while (it != end && !lex::IsKeyword(*it, lex::Keyword::Where)) {
+    while (it != end && !lex::IsSymbol(*it, lex::Symbol::RParen) &&
+           !lex::IsKeyword(*it, lex::Keyword::Where)) {
       {
         std::forward_iterator auto copy_it = it;
         if (ParseJoinType(copy_it, end).has_value()) {
