@@ -2,6 +2,7 @@
 
 #include <deadfood/lex/lex.hh>
 #include <deadfood/parse/parser_error.hh>
+#include <deadfood/util/str.hh>
 
 namespace deadfood::parse::util {
 template <typename It>
@@ -53,6 +54,15 @@ inline std::string ExpectIdentifier(const It& it, const It end) {
     return id->id;
   }
   throw ParserError("expected identifier");
+}
+
+inline std::pair<std::optional<std::string>, std::string> GetFullFieldName(
+    const std::string& name) {
+  if (const auto r = deadfood::util::SplitOnDot(name)) {
+    const auto& [tbl, field] = *r;
+    return {tbl, field};
+  }
+  return {std::nullopt, name};
 }
 
 }  // namespace deadfood::parse::util
