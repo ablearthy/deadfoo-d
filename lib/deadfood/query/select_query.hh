@@ -20,8 +20,10 @@ enum class JoinType { Left, Right, Inner };
 
 struct Join {
   JoinType type;
-  std::string table_name;
-  expr::FactorTree predicate;
+  std::string table_name_lhs;
+  std::string field_name_lhs;
+  std::string table_name_rhs;
+  std::string field_name_rhs;
 };
 
 struct SelectAllSelector {};
