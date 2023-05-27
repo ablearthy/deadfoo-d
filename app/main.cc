@@ -288,63 +288,65 @@ std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
   return scan;
 }
 
-std::vector<std::string> ObtainAllFields(Database& db,
-                                         const query::SelectFrom& from) {
-  std::vector<std::string> ret;
-  std::visit(
-      [&](auto&& arg) {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, FromTable>) {
-          const auto& schema = db.schemas().at(arg.table_name);
-          std::string table_name =
-              arg.renamed.has_value() ? arg.renamed.value() : arg.table_name;
-          table_name += '.';
-          for (const auto& field_name : schema.fields()) {
-            ret.emplace_back(table_name + field_name);
-          }
-        } else if constexpr (std::is_same_v<T, SelectQuery>) {
-          for (auto& source : arg.sources) {
-            const auto inner_fields = ObtainAllFields(db, source);
-            ret.insert(ret.end(), inner_fields.begin(), inner_fields.end());
-          }
-        }
-      },
-      from);
-  return ret;
-}
+struct ObtainAllFieldsVisitor {
+  Database& db;
+
+  std::vector<std::string> operator()(const query::FromTable& from_table) {
+    std::vector<std::string> ret;
+    const auto& schema = db.schemas().at(from_table.table_name);
+    std::string table_name = from_table.renamed.has_value()
+                                 ? from_table.renamed.value()
+                                 : from_table.table_name;
+    table_name += '.';
+    for (const auto& field_name : schema.fields()) {
+      ret.emplace_back(table_name + field_name);
+    }
+    return ret;
+  }
+
+  std::vector<std::string> operator()(const query::SelectQuery& query) {
+    std::vector<std::string> ret;
+    for (const auto& selector : query.selectors) {
+      std::visit(
+          [&](auto&& sel) {
+            using T = std::decay_t<decltype(sel)>;
+            if constexpr (std::is_same_v<T, SelectAllSelector>) {
+              for (const auto& source : query.sources) {
+                const auto inner_fields = std::visit(*this, source);
+                ret.insert(ret.end(), inner_fields.begin(), inner_fields.end());
+              }
+              for (const auto& join : query.joins) {
+                const auto inner_fields = operator()(FromTable{
+                    .table_name = join.table_name, .renamed = join.alias});
+                ret.insert(ret.end(), inner_fields.begin(), inner_fields.end());
+              }
+            } else if constexpr (std::is_same_v<T, std::string>) {
+              if (const auto c = FindTableByField(db.schemas(), query, sel)) {
+                ret.emplace_back(c->full_field_name);
+              } else {
+                ret.emplace_back(sel);
+              }
+            } else if constexpr (std::is_same_v<T, FieldSelector>) {
+              if (FindTableByField(db.schemas(), query, sel.field_name)
+                      .has_value()) {
+                throw std::runtime_error("ambiguous source for `" +
+                                         sel.field_name + "` field");
+              }
+              ret.emplace_back(sel.field_name);
+            }
+          },
+          selector);
+    }
+    return ret;
+  }
+};
 
 void ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
   auto scan = GetScanFromSelectQuery(db, query);
 
-  std::vector<std::string> fields;
+  ObtainAllFieldsVisitor vis{db};
+  std::vector<std::string> fields = vis(query);
 
-  for (const auto& selector : query.selectors) {
-    std::visit(
-        [&](auto&& arg) {
-          using T = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<T, SelectAllSelector>) {
-            for (const auto& source : query.sources) {
-              const auto inner_fields = ObtainAllFields(db, source);
-              fields.insert(fields.end(), inner_fields.begin(),
-                            inner_fields.end());
-            }
-          } else if constexpr (std::is_same_v<T, std::string>) {
-            if (const auto c = FindTableByField(db.schemas(), query, arg)) {
-              fields.emplace_back(c->full_field_name);
-            } else {
-              fields.emplace_back(arg);
-            }
-          } else if constexpr (std::is_same_v<T, FieldSelector>) {
-            if (FindTableByField(db.schemas(), query, arg.field_name)
-                    .has_value()) {
-              throw std::runtime_error("ambiguous source for `" +
-                                       arg.field_name + "` field");
-            }
-            fields.emplace_back(arg.field_name);
-          }
-        },
-        selector);
-  }
   scan->BeforeFirst();
   for (size_t i = 0; i < fields.size(); ++i) {
     std::cout << fields[i];
