@@ -81,14 +81,14 @@ void Database::RemoveTable(const std::string& table_name) {
   RemoveUnnecessaryConstraints(constraints_, table_name);
 }
 
-std::unique_ptr<scan::TableScan> Database::GetTableScan(
+std::unique_ptr<scan::IScan> Database::GetTableScan(
     const std::string& table_name) {
   auto& schema = schemas_.at(table_name);
   auto& table_storage = storage_.Get(table_name);
   return std::make_unique<scan::TableScan>(table_storage, schema, table_name);
 }
 
-std::unique_ptr<scan::TableScan> Database::GetTableScan(
+std::unique_ptr<scan::IScan> Database::GetTableScan(
     const std::string& table_name, const std::string& rename_table) {
   auto& schema = schemas_.at(table_name);
   auto& table_storage = storage_.Get(table_name);
