@@ -152,6 +152,12 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
       }
       ++it;
 
+      const auto [alias] = std::get<lex::Identifier>(*it);
+      if (deadfood::util::ContainsDot(alias)) {
+        throw ParserError("invalid alias");
+      }
+      ++it;
+
       util::ExpectKeyword(it, end, lex::Keyword::On, "expected `ON`");
       ++it;
       auto lhs = util::ExpectIdentifier(it, end);
@@ -171,6 +177,8 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
       }
       ret.joins.emplace_back(
           query::Join{.type = join_type.value(),
+                      .table_name = id,
+                      .alias = alias,
                       .table_name_lhs = maybe_split_left->first,
                       .field_name_lhs = maybe_split_left->second,
                       .table_name_rhs = maybe_split_right->first,
