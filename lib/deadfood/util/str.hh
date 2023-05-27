@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string>
+#include <optional>
 
 namespace deadfood::util {
 
@@ -16,6 +17,17 @@ inline std::basic_string<T> lowercase(const std::basic_string<T>& s) {
     return static_cast<T>(std::tolower(static_cast<unsigned char>(v)));
   });
   return s2;
+}
+
+inline std::optional<std::pair<std::string, std::string>> SplitOnDot(
+    const std::string& s) {
+  auto pos = std::find(s.cbegin(), s.cend(), '.');
+  if (pos == s.end()) {
+    return std::nullopt;
+  }
+  std::string before(s.begin(), pos);
+  std::string after(pos + 1, s.end());
+  return std::make_optional<std::pair<std::string, std::string>>(before, after);
 }
 
 }  // namespace deadfood::util
