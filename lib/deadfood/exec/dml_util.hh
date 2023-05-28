@@ -15,4 +15,11 @@ void CheckUniquenessConstraint(Database& db, const std::string& table_name,
                                const std::string& field_name,
                                const core::FieldVariant& value);
 
+enum class Action { Update, Delete };
+
+void CheckForeignKeyConstraint(Database& db, const std::string& table_name,
+                               const std::string& field_name,
+                               const core::FieldVariant& value,
+                               const Action& action);
+
 }  // namespace deadfood::exec::util
