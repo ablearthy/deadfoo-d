@@ -79,14 +79,15 @@ enum class Symbol {
   Minus,
   Mul,
   Div,
-  Comma
+  Comma,
+  ExclamationMark
 };
 
 static std::map<char, Symbol> kCharToSymbol = {
     {'(', Symbol::LParen}, {')', Symbol::RParen}, {'=', Symbol::Eq},
     {'<', Symbol::Less},   {'>', Symbol::More},   {'+', Symbol::Plus},
     {'-', Symbol::Minus},  {'*', Symbol::Mul},    {'/', Symbol::Div},
-    {',', Symbol::Comma}};
+    {',', Symbol::Comma},  {'!', Symbol::ExclamationMark}};
 
 struct Identifier {
   std::string id;
