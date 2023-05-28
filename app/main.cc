@@ -30,6 +30,7 @@
 #include <deadfood/parse/select_parser.hh>
 #include <deadfood/exec/select/find_table_by_field.hh>
 #include <deadfood/scan/extend_scan.hh>
+#include <deadfood/scan/left_join_scan.hh>
 
 using namespace deadfood::core;
 using namespace deadfood::storage;
@@ -251,19 +252,36 @@ std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
   }
 
   for (const auto& join : query.joins) {
-    // TODO: left & right join support
-    std::unique_ptr<IScan> tmp = std::make_unique<ProductScan>(
-        db.GetTableScan(join.table_name, join.alias), std::move(scan));
-
+    std::unique_ptr<IScan> tmp;
     std::string lhs_field_name =
         join.table_name_lhs + "." + join.field_name_lhs;
     std::string rhs_field_name =
         join.table_name_rhs + "." + join.field_name_rhs;
-    scan = std::make_unique<SelectScan>(
-        std::move(tmp),
-        expr::BoolExpr(std::make_unique<CmpExpr>(
-            CmpOp::Eq, std::make_unique<FieldExpr>(tmp.get(), lhs_field_name),
-            std::make_unique<FieldExpr>(tmp.get(), rhs_field_name))));
+    if (join.table_name_rhs == join.alias) {
+      std::swap(lhs_field_name, rhs_field_name);
+    } else if (join.table_name_lhs != join.alias) {
+      throw std::runtime_error("use alias instead of full name table");
+    }
+
+    if (join.type == JoinType::Inner) {
+      tmp = std::make_unique<ProductScan>(
+          db.GetTableScan(join.table_name, join.alias), std::move(scan));
+      scan = std::make_unique<SelectScan>(
+          std::move(tmp),
+          expr::BoolExpr(std::make_unique<CmpExpr>(
+              CmpOp::Eq, std::make_unique<FieldExpr>(tmp.get(), lhs_field_name),
+              std::make_unique<FieldExpr>(tmp.get(), rhs_field_name))));
+    } else if (join.type == JoinType::Left) {
+      scan = std::make_unique<LeftJoinScan>(
+          std::move(scan), db.GetTableScan(join.table_name, join.alias),
+          rhs_field_name, lhs_field_name);
+    } else if (join.type == JoinType::Right) {
+      scan = std::make_unique<LeftJoinScan>(
+          db.GetTableScan(join.table_name, join.alias), std::move(scan),
+          lhs_field_name, rhs_field_name);
+    } else {
+      throw std::runtime_error("unhandled join type");
+    }
   }
 
   for (const auto& selector : query.selectors) {
