@@ -80,7 +80,7 @@ void TableScan::Delete() {
 
   auto copy_it = it_;
   if (storage_.storage().begin() == it_) {
-    ++copy_it;
+    before_start_ = true;
   } else {
     --copy_it;
   }
