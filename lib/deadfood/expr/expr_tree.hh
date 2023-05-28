@@ -7,7 +7,22 @@
 
 namespace deadfood::expr {
 
-enum class GenBinOp { Or, And, Xor, Plus, Minus, Mul, Div, Eq, LT, LE, GE, GT, Is, IsNot };
+enum class GenBinOp {
+  Or,
+  And,
+  Xor,
+  Plus,
+  Minus,
+  Mul,
+  Div,
+  Eq,
+  LT,
+  LE,
+  GE,
+  GT,
+  Is,
+  IsNot
+};
 
 using Constant = std::variant<int, double, std::string, bool, core::null_t>;
 
@@ -18,10 +33,14 @@ struct ExprTree {
   std::vector<FactorTree> factors;
 };
 
+struct ExprId {
+  std::string id;
+};
+
 struct FactorTree {
   bool neg_applied;
   bool not_applied;
-  std::variant<ExprTree, std::string, Constant> factor;
+  std::variant<ExprTree, ExprId, Constant> factor;
 };
 
 }  // namespace deadfood::expr
