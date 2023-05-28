@@ -32,6 +32,10 @@
 #include <deadfood/scan/extend_scan.hh>
 #include <deadfood/scan/left_join_scan.hh>
 
+#include <deadfood/exec/create_table.hh>
+#include <deadfood/exec/drop_table.hh>
+#include <deadfood/exec/insert_into.hh>
+
 using namespace deadfood::core;
 using namespace deadfood::storage;
 using namespace deadfood::scan;
@@ -41,175 +45,6 @@ using namespace deadfood::parse;
 using namespace deadfood::query;
 using namespace deadfood::exec;
 using namespace deadfood;
-
-void ExecuteCreateTableQuery(
-    Database& db,
-    const std::pair<query::CreateTableQuery, std::vector<core::Constraint>>&
-        query) {
-  const auto& [q, constraints] = query;
-  if (db.Exists(q.table_name())) {
-    throw std::runtime_error("table already exists");
-  }
-  Schema schema;
-  for (const auto& field_name : q.field_names()) {
-    const auto field = q.GetField(field_name);
-    schema.AddField(field_name, field, q.MayBeNull(field_name),
-                    q.IsUnique(field_name));
-  }
-  db.AddTable(q.table_name(), schema);
-  for (const auto& c : constraints) {
-    db.constraints().emplace_back(c);
-  }
-}
-
-void ExecuteDropTableQuery(Database& db, const std::string& table_name) {
-  if (!db.Exists(table_name)) {
-    throw std::runtime_error("table does not exist");
-  }
-  for (const auto& constr : db.constraints()) {
-    if (!std::holds_alternative<ReferencesConstraint>(constr)) {
-      continue;
-    }
-    const auto ref_constr = std::get<ReferencesConstraint>(constr);
-    if (ref_constr.master_table == table_name &&
-        ref_constr.on_delete == ReferencesConstraint::OnAction::NoAction) {
-      auto scan_slave = db.GetTableScan(ref_constr.slave_table);
-      auto scan_master = db.GetTableScan(ref_constr.master_table);
-
-      // EXISTS(SELECT 1 FROM master_table WHERE EXISTS(SELECT 1 FROM
-      // slave_table WHERE slave_table.slave_field = master_table.master_field))
-
-      std::unique_ptr<IExpr> cmp_fields = std::make_unique<CmpExpr>(
-          CmpOp::Eq,
-          std::make_unique<FieldExpr>(scan_slave.get(), ref_constr.slave_field),
-          std::make_unique<FieldExpr>(scan_master.get(),
-                                      ref_constr.master_field));
-      std::unique_ptr<IScan> inner_select = std::make_unique<SelectScan>(
-          std::move(scan_slave), expr::BoolExpr(std::move(cmp_fields)));
-      std::unique_ptr<IExpr> expr =
-          std::make_unique<ExistsExpr>(std::move(inner_select));
-      std::unique_ptr<IScan> select = std::make_unique<SelectScan>(
-          std::move(scan_master), expr::BoolExpr(std::move(expr)));
-
-      ExistsExpr exists(std::move(select));
-      if (std::get<bool>(exists.Eval())) {
-        throw std::runtime_error("foreign key violated");
-      }
-    }
-  }
-  db.RemoveTable(table_name);
-}
-
-void ExecuteInsertQuery(Database& db, const InsertQuery& query) {
-  if (!db.Exists(query.table_name)) {
-    throw std::runtime_error("table does not exist");
-  }
-  if (query.fields.has_value()) {
-    // check not null
-    const auto& schema = db.schemas().at(query.table_name);
-    std::set<std::string> query_fields{query.fields->begin(),
-                                       query.fields->end()};
-    for (const auto& field : schema.fields()) {
-      if (!schema.MayBeNull(field) && !query_fields.contains(field)) {
-        throw std::runtime_error("specify " + field + " field");
-      }
-    }
-  }
-
-  const auto schema = db.schemas().at(query.table_name);
-  std::vector<std::string> fields;
-  if (query.fields.has_value()) {
-    fields = query.fields.value();
-  } else {
-    fields = schema.fields();
-  }
-  for (const auto& row : query.values) {
-    if (row.size() != fields.size()) {
-      throw std::runtime_error("got invalid rows");
-    }
-  }
-
-  ExprTreeConverter converter{std::make_unique<InsertIntoGetTableScan>()};
-  std::vector<std::vector<core::FieldVariant>> actual_values;
-  for (const auto& row : query.values) {
-    if (row.size() != fields.size()) {
-      throw std::runtime_error("got invalid rows");
-    }
-    std::vector<core::FieldVariant> actual_values_row;
-    for (size_t i = 0; i < row.size(); ++i) {
-      auto e = converter.ConvertExprTreeToIExpr(row[i]);
-      auto val = e->Eval();
-      std::visit(
-          [&](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, core::null_t>) {
-              if (!schema.MayBeNull(fields[i])) {
-                throw std::runtime_error("passed null to non-null field");
-              }
-            } else if constexpr (deadfood::util::IsNumberT<T>::value) {
-              const auto info = schema.field_info(fields[i]);
-              if (info.type() == core::Field::FieldType::Varchar) {
-                throw std::runtime_error("cannot convert number into string");
-              }
-            } else if constexpr (std::is_same_v<T, std::string>) {
-              const auto info = schema.field_info(fields[i]);
-              if (info.type() != core::Field::FieldType::Varchar) {
-                throw std::runtime_error(
-                    "cannot convert string into non-string");
-              }
-              if (info.size() < arg.size()) {
-                throw std::runtime_error("the string is too large");
-              }
-            }
-          },
-          val);
-      auto norm_val = std::visit(
-          [&](auto&& arg) -> core::FieldVariant {
-            using T = std::decay_t<decltype(arg)>;
-
-            if constexpr (deadfood::util::IsNumberT<T>::value) {
-              const auto info = schema.field_info(fields[i]);
-              switch (info.type()) {
-                case Field::FieldType::Bool:
-                  return static_cast<bool>(arg);
-                case Field::FieldType::Int:
-                  return static_cast<int>(arg);
-                case Field::FieldType::Float:
-                  return static_cast<float>(arg);
-                case Field::FieldType::Double:
-                  return static_cast<double>(arg);
-                case Field::FieldType::Varchar:
-                  throw std::runtime_error("cannot convert number into string");
-              }
-            }
-            return arg;
-          },
-          val);
-
-      actual_values_row.emplace_back(std::move(norm_val));
-    }
-    actual_values.emplace_back(std::move(actual_values_row));
-  }
-  auto scan = db.GetTableScan(query.table_name);
-  scan->BeforeFirst();
-  for (const auto& row : actual_values) {
-    scan->Insert();
-    for (size_t i = 0; i < row.size(); ++i) {
-      if (schema.IsUnique(fields[i])) {
-        auto unique_scan = db.GetTableScan(query.table_name);
-        std::unique_ptr<IExpr> predicate = std::make_unique<CmpExpr>(
-            CmpOp::Eq, std::make_unique<ConstExpr>(row[i]),
-            std::make_unique<FieldExpr>(unique_scan.get(), fields[i]));
-        ExistsExpr exists(std::make_unique<SelectScan>(
-            std::move(unique_scan), BoolExpr(std::move(predicate))));
-        if (std::get<bool>(exists.Eval())) {
-          throw std::runtime_error("unique constraint violated");
-        }
-      }
-      scan->SetField(fields[i], row[i]);
-    }
-  }
-}
 
 std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
                                               const query::SelectQuery& query);
@@ -399,10 +234,10 @@ void ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
 void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
   if (IsKeyword(tokens[0], Keyword::Create)) {  // create table query
     const auto q = ParseCreateTableQuery(tokens);
-    ExecuteCreateTableQuery(db, q);
+    exec::ExecuteCreateTableQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Drop)) {  // drop table query
     const auto q = ParseDropTableQuery(tokens);
-    ExecuteDropTableQuery(db, q);
+    exec::ExecuteDropTableQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Update)) {  // update query
 
   } else if (IsKeyword(tokens[0], Keyword::Delete)) {  // delete query
@@ -457,6 +292,18 @@ int main() {
   }
   //      Dump(db, "/tmp/f");
 }
+
+//> CREATE TABLE x (a INT, b INT)
+//> CREATE TABLE y (c INT, d INT)
+//> INSERT INTO x VALUES (1, 42), (2, 43), (3, 45)
+//> INSERT INTO y VALUES (1, 555), (3, 666)
+//> SELECT * FROM x LEFT JOIN y al ON al.c = x.a
+
+//> CREATE TABLE x (a INT)
+//    > CREATE TABLE y (b INT)
+//    > INSERT INTO x VALUES (1), (2)
+//        > INSERT INTO y VALUES (55), (42)
+//        > SELECT * FROM x, (SELECT b + 1 AS z FROM y)
 
 //  TableStorage storage1, storage2;
 //
