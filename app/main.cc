@@ -15,6 +15,8 @@
 #include <deadfood/parse/create_table_parser.hh>
 #include <deadfood/parse/drop_table_parser.hh>
 #include <deadfood/parse/insert_parser.hh>
+#include <deadfood/parse/update_parser.hh>
+#include <deadfood/parse/delete_parser.hh>
 #include <deadfood/parse/parser_error.hh>
 #include <deadfood/database.hh>
 #include <deadfood/parse/expr_tree_parser.hh>
@@ -23,7 +25,7 @@
 #include <readline/history.h>
 #include <deadfood/expr/exists_expr.hh>
 #include <deadfood/expr/expr_convert.hh>
-#include <deadfood/expr/insert_into_get_table_scan.hh>
+#include <deadfood/expr/scan_selector/no_scan_selector.hh>
 
 #include <deadfood/util/is_number_t.hh>
 #include <deadfood/expr/const_expr.hh>
@@ -35,6 +37,9 @@
 #include <deadfood/exec/create_table.hh>
 #include <deadfood/exec/drop_table.hh>
 #include <deadfood/exec/insert_into.hh>
+#include <deadfood/expr/scan_selector/simple_scan_selector.hh>
+#include <deadfood/exec/update.hh>
+#include <deadfood/exec/delete.hh>
 
 using namespace deadfood::core;
 using namespace deadfood::storage;
@@ -66,16 +71,6 @@ std::unique_ptr<IScan> GetScanFromSource(Database& db,
       },
       from);
 }
-
-class SelectFromGetTableScan : public GetTableScan {
- public:
-  SelectFromGetTableScan(IScan* internal) : internal_{internal} {}
-
-  IScan* GetScan(const std::string& field_name) override { return internal_; }
-
- private:
-  IScan* internal_;
-};
 
 std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
                                               const query::SelectQuery& query) {
@@ -122,7 +117,7 @@ std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
   for (const auto& selector : query.selectors) {
     if (auto s = std::get_if<FieldSelector>(&selector)) {
       ExprTreeConverter converter{
-          std::make_unique<SelectFromGetTableScan>(scan.get())};
+          std::make_unique<SimpleScanSelector>(scan.get())};
 
       scan = std::make_unique<ExtendScan>(
           std::move(scan), converter.ConvertExprTreeToIExpr(s->expr),
@@ -132,7 +127,7 @@ std::unique_ptr<IScan> GetScanFromSelectQuery(Database& db,
 
   if (query.predicate.has_value()) {
     ExprTreeConverter converter{
-        std::make_unique<SelectFromGetTableScan>(scan.get())};
+        std::make_unique<SimpleScanSelector>(scan.get())};
     scan = std::make_unique<SelectScan>(
         std::move(scan), expr::BoolExpr(converter.ConvertExprTreeToIExpr(
                              query.predicate.value())));
@@ -239,9 +234,11 @@ void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
     const auto q = ParseDropTableQuery(tokens);
     exec::ExecuteDropTableQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Update)) {  // update query
-
+    const auto q = ParseUpdateQuery(tokens);
+    exec::ExecuteUpdateQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Delete)) {  // delete query
-
+    const auto q = ParseDeleteQuery(tokens);
+    exec::ExecuteDeleteQuery(db, q);
   } else if (IsKeyword(tokens[0], Keyword::Insert)) {  // insert query
     const auto q = ParseInsertQuery(tokens);
     ExecuteInsertQuery(db, q);
@@ -253,108 +250,57 @@ void ProcessQueryInternal(Database& db, const std::vector<Token>& tokens) {
     return;
   }
 }
-void ProcessQuery(Database& db, const std::string& query) {
+
+int ProcessQuery(Database& db, const std::string& query) {
   std::vector<Token> tokens;
   try {
     tokens = Lex(query);
   } catch (const std::runtime_error& err) {
     std::cout << "[error (lex)] " << err.what() << '\n';
-    return;
+    return 1;
   }
   if (tokens.empty()) {
     std::cout << "expected some input\n";
-    return;
+    return 1;
+  }
+  if (std::holds_alternative<lex::Identifier>(tokens[0]) &&
+      std::get<lex::Identifier>(tokens[0]).id == ".exit") {
+    return -1;
   }
   try {
     ProcessQueryInternal(db, tokens);
   } catch (const ParserError& e) {
     std::cout << "[error (parse)] " << e.what() << '\n';
-    return;
+    return 1;
   } catch (const std::runtime_error& err) {
     std::cout << "[error (runtime)] " << err.what() << '\n';
-    return;
+    return 1;
   }
+  return 0;
 }
 
-int main() {
+int main(int argc, char** argv) {
+  std::optional<char*> path;
   Database db;
-  //  auto db = Load("/tmp/f");
-  //  for (const auto& tbl : db.table_names()) {
-  //    std::cout << tbl << '\n';
-  //  }
+  if (argc == 2) {
+    path = argv[1];
+    db = Load(path.value());
+  } else {
+    std::cout << "! in-memory\n";
+  }
+
   char* query_buf;
   while ((query_buf = readline("> ")) != nullptr) {
     std::string query{query_buf};
     add_history(query_buf);
 
     free(query_buf);
-    ProcessQuery(db, query);
+    auto ret_code = ProcessQuery(db, query);
+    if (ret_code == -1) {
+      break;
+    }
   }
-  //      Dump(db, "/tmp/f");
+  if (path.has_value()) {
+    Dump(db, path.value());
+  }
 }
-
-//> CREATE TABLE x (a INT, b INT)
-//> CREATE TABLE y (c INT, d INT)
-//> INSERT INTO x VALUES (1, 42), (2, 43), (3, 45)
-//> INSERT INTO y VALUES (1, 555), (3, 666)
-//> SELECT * FROM x LEFT JOIN y al ON al.c = x.a
-
-//> CREATE TABLE x (a INT)
-//    > CREATE TABLE y (b INT)
-//    > INSERT INTO x VALUES (1), (2)
-//        > INSERT INTO y VALUES (55), (42)
-//        > SELECT * FROM x, (SELECT b + 1 AS z FROM y)
-
-//  TableStorage storage1, storage2;
-//
-//  Schema schema1, schema2;
-//
-//  schema1.AddField("a", field::kBoolField);
-//  schema1.AddField("b", field::kIntField);
-//  schema1.AddField("c", field::kFloatField);
-//
-//  schema2.AddField("d", field::kIntField);
-//
-//  std::unique_ptr<IScan> scan1 = std::make_unique<TableScan>(storage1,
-//  schema1); std::unique_ptr<IScan> scan2 =
-//  std::make_unique<TableScan>(storage2, schema2);
-//
-//  scan1->BeforeFirst();
-//  scan2->BeforeFirst();
-//  float x = 42.0;
-//  bool b = true;
-//  for (int i = 2; i < 10; ++i) {
-//    scan1->Insert();
-//    scan1->SetField("a", b);
-//    scan1->SetField("b", i);
-//    scan1->SetField("c", x);
-//
-//    scan2->Insert();
-//    scan2->SetField("d", static_cast<int>(x));
-//    b = !b;
-//    x *= 5;
-//  }
-//
-//  //  scan2->BeforeFirst();
-//  //  while (scan2->Next()) {
-//  //    std::cout << std::get<int>(scan2->GetField("d")) << '\n';
-//  //  }
-//
-//  std::unique_ptr<IExpr> e1{std::make_unique<FieldExpr>(scan1.get(), "c")};
-//  std::unique_ptr<IExpr> e2{std::make_unique<FieldExpr>(scan2.get(), "d")};
-//
-//  std::unique_ptr<IExpr> expr{
-//      std::make_unique<CmpExpr>(CmpOp::Eq, std::move(e1), std::move(e2))};
-//
-//  BoolExpr predicate{std::move(expr)};
-//
-//  std::unique_ptr<IScan> ps{
-//      std::make_unique<ProductScan>(std::move(scan1), std::move(scan2))};
-//
-//  std::unique_ptr<IScan> ss{std::make_unique<SelectScan>(std::move(ps),
-//  std::move(predicate))}; ss->BeforeFirst(); while (ss->Next()) {
-//    std::cout << std::get<bool>(ss->GetField("a")) << ' '
-//              << std::get<int>(ss->GetField("b")) << ' '
-//              << std::get<float>(ss->GetField("c")) << ' '
-//              << std::get<int>(ss->GetField("d")) << '\n';
-//  }
