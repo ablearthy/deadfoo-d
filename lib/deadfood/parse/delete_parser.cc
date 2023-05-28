@@ -10,7 +10,7 @@ template <std::forward_iterator It>
 query::DeleteQuery ParseDeleteQueryInternal(It& it, const It end) {
   util::ParseKeyword(it, end, lex::Keyword::Delete);
   util::ParseKeyword(it, end, lex::Keyword::From);
-  auto table_name = util::ParseTableName(it, end);
+  auto table_name = util::ParseIdWithoutDot(it, end);
   if (it == end || !lex::IsKeyword(*it, lex::Keyword::Where)) {
     return {table_name, std::nullopt};
   }
