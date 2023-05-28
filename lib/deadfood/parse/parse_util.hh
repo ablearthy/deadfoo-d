@@ -11,10 +11,10 @@
 namespace deadfood::parse::util {
 
 template <std::forward_iterator It>
-inline std::string ParseTableName(It& it, const It end) {
+inline std::string ParseIdWithoutDot(It& it, const It end) {
   auto id = ExpectIdentifier(it, end);
   RaiseParserErrorIf(deadfood::util::ContainsDot(id),
-                     "table name contains dot");
+                     "invalid identifier: contains dot");
   ++it;
   return id;
 }
