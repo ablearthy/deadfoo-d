@@ -108,7 +108,7 @@ static const std::vector<std::vector<expr::GenBinOp>> kPrecedence = {
     {expr::GenBinOp::Xor},
     {expr::GenBinOp::LE, expr::GenBinOp::GE, expr::GenBinOp::GT,
      expr::GenBinOp::LT, expr::GenBinOp::Eq, expr::GenBinOp::Is,
-     expr::GenBinOp::IsNot},
+     expr::GenBinOp::IsNot, expr::GenBinOp::NotEq},
     {expr::GenBinOp::Plus, expr::GenBinOp::Minus},
     {expr::GenBinOp::Mul, expr::GenBinOp::Div}};
 
@@ -172,6 +172,13 @@ std::optional<expr::GenBinOp> ParseOp(It& it, const It end) {
   } else if (lex::IsKeyword(*it, lex::Keyword::Xor)) {
     ++it;
     return expr::GenBinOp::Xor;
+  } else if (lex::IsSymbol(*it, lex::Symbol::ExclamationMark)) {
+    ++it;
+    if (it == end || !lex::IsSymbol(*it, lex::Symbol::Eq)) {
+      throw ParserError("expected `!=`");
+    }
+    ++it;
+    return expr::GenBinOp::NotEq;
   }
   return std::nullopt;
 }
