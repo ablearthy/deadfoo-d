@@ -87,9 +87,9 @@ struct ExprTreeConverterVisitor {
     }
   }
 
-  std::unique_ptr<IExpr> operator()(const std::string& field_name) {
-    return std::make_unique<FieldExpr>(get_table_scan->GetScan(field_name),
-                                       field_name);
+  std::unique_ptr<IExpr> operator()(const ExprId& field_name) {
+    return std::make_unique<FieldExpr>(get_table_scan->GetScan(field_name.id),
+                                       field_name.id);
   }
   std::unique_ptr<IExpr> operator()(const Constant& constant) {
     core::FieldVariant var = std::visit(

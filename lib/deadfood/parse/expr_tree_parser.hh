@@ -46,7 +46,7 @@ struct my_visitor {
     ++it;
     return expr::FactorTree{.neg_applied = neg_applied,
                             .not_applied = not_applied,
-                            .factor = tok.id};
+                            .factor = expr::ExprId{tok.id}};
   }
 
   std::optional<expr::FactorTree> operator()(const int& tok) {
