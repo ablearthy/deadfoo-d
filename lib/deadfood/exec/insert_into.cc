@@ -57,6 +57,7 @@ std::vector<std::vector<core::FieldVariant>> RetrieveValues(
     }
     actual_values.emplace_back(std::move(actual_values_row));
   }
+  return actual_values;
 }
 
 void ExecuteInsertQuery(Database& db, const query::InsertQuery& query) {
