@@ -4,7 +4,7 @@
 
 namespace deadfood::expr {
 
-class InsertIntoGetTableScan : public GetTableScan {
+class NoScanSelector : public IScanSelector {
  public:
   scan::IScan* GetScan(const std::string& field_name) override;
 };

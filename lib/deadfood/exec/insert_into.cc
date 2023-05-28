@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <deadfood/expr/expr_convert.hh>
-#include <deadfood/expr/insert_into_get_table_scan.hh>
+#include <deadfood/expr/scan_selector/no_scan_selector.hh>
 #include <deadfood/util/is_number_t.hh>
 #include <functional>
 #include <deadfood/expr/const_expr.hh>
@@ -64,7 +64,7 @@ std::vector<std::vector<core::FieldVariant>> RetrieveValues(
     const core::Schema& schema, const std::vector<std::string>& fields,
     const query::InsertQuery& query) {
   expr::ExprTreeConverter converter{
-      std::make_unique<expr::InsertIntoGetTableScan>()};
+      std::make_unique<expr::NoScanSelector>()};
   std::vector<std::vector<core::FieldVariant>> actual_values;
 
   for (const auto& row : query.values) {
