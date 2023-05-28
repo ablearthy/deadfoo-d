@@ -14,7 +14,7 @@ std::unique_ptr<IExpr> ConvertExprTreeToIExpr(const FactorTree& tree) {
   return nullptr;
 }
 
-ExprTreeConverter::ExprTreeConverter(std::unique_ptr<GetTableScan> scan)
+ExprTreeConverter::ExprTreeConverter(std::unique_ptr<IScanSelector> scan)
     : get_table_scan_{std::move(scan)} {}
 
 void RaiseIfNotBinFactors(const std::vector<expr::FactorTree>& factors) {
@@ -24,7 +24,7 @@ void RaiseIfNotBinFactors(const std::vector<expr::FactorTree>& factors) {
 }
 
 struct ExprTreeConverterVisitor {
-  GetTableScan* get_table_scan;
+  IScanSelector* get_table_scan;
   ExprTreeConverter& expr_tree_converter;
 
   std::unique_ptr<IExpr> operator()(const ExprTree& expr) {
