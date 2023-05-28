@@ -3,27 +3,17 @@
 #include <algorithm>
 #include <deadfood/parse/parser_error.hh>
 
-#include <deadfood/util/str.hh>
+#include <deadfood/parse/parse_util.hh>
 
 namespace deadfood::parse {
 
 std::string ParseDropTableQuery(const std::vector<lex::Token>& tokens) {
-  if (tokens.size() != 3) {
-    throw ParserError("unexpected input");
-  }
-  if (!lex::IsKeyword(tokens[0], lex::Keyword::Drop)) {
-    throw ParserError("expected `DROP`");
-  }
-  if (!lex::IsKeyword(tokens[1], lex::Keyword::Table)) {
-    throw ParserError("expected `TABLE`");
-  }
-  if (!std::holds_alternative<lex::Identifier>(tokens[2])) {
-    throw ParserError("expected identifier: table name");
-  }
-  auto table_name = std::get<lex::Identifier>(tokens[2]).id;
-  if (deadfood::util::ContainsDot(table_name)) {
-    throw ParserError("table name contains invalid characters");
-  }
+  auto it = tokens.begin();
+  const auto end = tokens.end();
+  util::ParseKeyword(it, end, lex::Keyword::Drop);
+  util::ParseKeyword(it, end, lex::Keyword::Table);
+  auto table_name = util::ParseIdWithoutDot(it, end);
+  util::RaiseParserErrorIf(it != end, "unexpected end");
   return table_name;
 }
 
