@@ -78,6 +78,18 @@ void CheckUniquenessConstraint(Database& db, const std::string& table_name,
   }
 }
 
+bool MatchesAction(const core::ReferencesConstraint& constraint,
+                   const Action& action) {
+  switch (action) {
+    case Action::Update:
+      return constraint.on_update ==
+             core::ReferencesConstraint::OnAction::NoAction;
+    case Action::Delete:
+      return constraint.on_delete ==
+             core::ReferencesConstraint::OnAction::NoAction;
+  }
+}
+
 void CheckForeignKeyConstraint(Database& db, const std::string& table_name,
                                const std::string& field_name,
                                const core::FieldVariant& value,
@@ -87,22 +99,32 @@ void CheckForeignKeyConstraint(Database& db, const std::string& table_name,
       if (c->master_table != table_name || c->master_field != field_name) {
         continue;
       }
-      bool matches = false;
-      switch (action) {
-        case Action::Update:
-          matches =
-              c->on_update == core::ReferencesConstraint::OnAction::NoAction;
-          break;
-        case Action::Delete:
-          matches =
-              c->on_delete == core::ReferencesConstraint::OnAction::NoAction;
-          break;
-      }
-      if (!matches) {
+
+      if (!MatchesAction(*c, action)) {
         continue;
       }
       if (CountRowsWithMatchingField(db, c->slave_table, c->slave_field, value,
                                      1) > 0) {
+        throw std::runtime_error("foreign key constraint violated");
+      }
+    }
+  }
+}
+
+void CheckForeignKeyConstraintForRow(Database& db, scan::IScan* scan,
+                                     const std::string& table_name,
+                                     const Action& action) {
+  const auto schema = db.schemas().at(table_name);
+  for (const auto& constraint : db.constraints()) {
+    if (auto c = std::get_if<core::ReferencesConstraint>(&constraint)) {
+      if (c->master_table != table_name || !schema.Exists(c->master_field)) {
+        continue;
+      }
+      if (!MatchesAction(*c, action)) {
+        continue;
+      }
+      if (CountRowsWithMatchingField(db, c->slave_table, c->slave_field,
+                                     scan->GetField(c->master_field), 1) > 0) {
         throw std::runtime_error("foreign key constraint violated");
       }
     }
