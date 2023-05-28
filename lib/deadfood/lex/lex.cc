@@ -121,44 +121,13 @@ std::vector<Token> Lex(std::string_view input) {
       } else {
         tokens.emplace_back(Identifier{str});
       }
-    } else {
-      switch (input[0]) {
-        case '(':
-          tokens.emplace_back(Symbol::LParen);
-          break;
-        case ')':
-          tokens.emplace_back(Symbol::RParen);
-          break;
-        case '=':
-          tokens.emplace_back(Symbol::Eq);
-          break;
-        case '<':
-          tokens.emplace_back(Symbol::Less);
-          break;
-        case '>':
-          tokens.emplace_back(Symbol::More);
-          break;
-        case '+':
-          tokens.emplace_back(Symbol::Plus);
-          break;
-        case '-':
-          tokens.emplace_back(Symbol::Minus);
-          break;
-        case '*':
-          tokens.emplace_back(Symbol::Mul);
-          break;
-        case '/':
-          tokens.emplace_back(Symbol::Div);
-          break;
-        case ',':
-          tokens.emplace_back(Symbol::Comma);
-          break;
-        default:
-          std::stringstream ss;
-          ss << "unknown symbol `" << input[0] << '`';
-          throw std::runtime_error(ss.str());
-      }
+    } else if (kCharToSymbol.contains(input[0])) {
+      tokens.emplace_back(kCharToSymbol.at(input[0]));
       input.remove_prefix(1);
+    } else {
+      std::stringstream ss;
+      ss << "unknown symbol `" << input[0] << '`';
+      throw std::runtime_error(ss.str());
     }
   }
   return tokens;

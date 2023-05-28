@@ -10,11 +10,11 @@
 namespace deadfood::lex {
 
 static const std::set<std::string> kKeywords = {
-    "select",  "from",    "where",   "and",        "or",     "xor",
-    "insert",  "into",    "values",  "delete",     "update", "set",
-    "create",  "table",   "boolean", "int",        "float",  "double",
-    "varchar", "as",      "join",    "on",         "exists", "null",
-    "primary", "foreign", "key",     "references", "unique", "not", "drop"};
+    "select",  "from",   "where",  "and",     "or",      "xor",    "insert",
+    "into",    "values", "delete", "update",  "set",     "create", "table",
+    "boolean", "int",    "float",  "double",  "varchar", "as",     "join",
+    "on",      "exists", "null",   "primary", "foreign", "key",    "references",
+    "unique",  "not",    "drop"};
 
 enum class Keyword {
   Select,
@@ -81,6 +81,12 @@ enum class Symbol {
   Div,
   Comma
 };
+
+static std::map<char, Symbol> kCharToSymbol = {
+    {'(', Symbol::LParen}, {')', Symbol::RParen}, {'=', Symbol::Eq},
+    {'<', Symbol::Less},   {'>', Symbol::More},   {'+', Symbol::Plus},
+    {'-', Symbol::Minus},  {'*', Symbol::Mul},    {'/', Symbol::Div},
+    {',', Symbol::Comma}};
 
 struct Identifier {
   std::string id;
