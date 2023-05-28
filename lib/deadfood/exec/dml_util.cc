@@ -10,6 +10,8 @@
 
 #include <deadfood/scan/select_scan.hh>
 
+#include <deadfood/exec/dql_util.hh>
+
 namespace deadfood::exec::util {
 
 struct ValidateTypeVisitor {
@@ -71,16 +73,39 @@ core::FieldVariant NormalizeFieldVariant(
 void CheckUniquenessConstraint(Database& db, const std::string& table_name,
                                const std::string& field_name,
                                const core::FieldVariant& value) {
-  auto scan = db.GetTableScan(table_name);
-
-  std::unique_ptr<expr::IExpr> predicate = std::make_unique<expr::CmpExpr>(
-      expr::CmpOp::Eq, std::make_unique<expr::ConstExpr>(value),
-      std::make_unique<expr::FieldExpr>(scan.get(), field_name));
-
-  expr::ExistsExpr exists(std::make_unique<scan::SelectScan>(
-      std::move(scan), expr::BoolExpr(std::move(predicate))));
-  if (std::get<bool>(exists.Eval())) {
+  if (CountRowsWithMatchingField(db, table_name, field_name, value, 1) > 0) {
     throw std::runtime_error("unique constraint violated");
+  }
+}
+
+void CheckForeignKeyConstraint(Database& db, const std::string& table_name,
+                               const std::string& field_name,
+                               const core::FieldVariant& value,
+                               const Action& action) {
+  for (const auto& constraint : db.constraints()) {
+    if (auto c = std::get_if<core::ReferencesConstraint>(&constraint)) {
+      if (c->master_table != table_name || c->master_field != field_name) {
+        continue;
+      }
+      bool matches = false;
+      switch (action) {
+        case Action::Update:
+          matches =
+              c->on_update == core::ReferencesConstraint::OnAction::NoAction;
+          break;
+        case Action::Delete:
+          matches =
+              c->on_delete == core::ReferencesConstraint::OnAction::NoAction;
+          break;
+      }
+      if (!matches) {
+        continue;
+      }
+      if (CountRowsWithMatchingField(db, c->slave_table, c->slave_field, value,
+                                     1) > 0) {
+        throw std::runtime_error("foreign key constraint violated");
+      }
+    }
   }
 }
 
