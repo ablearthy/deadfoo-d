@@ -46,6 +46,10 @@ struct ExprTreeConverterVisitor {
         return GetMathExpr(expr.factors, MathExprOp::Mul);
       case GenBinOp::Div:
         return GetMathExpr(expr.factors, MathExprOp::Div);
+      case GenBinOp::NotEq:
+        RaiseIfNotBinFactors(expr.factors);
+        return std::make_unique<NotExpr>(
+            GetTrivialCmpExpr(expr.factors, CmpOp::Eq, 0, 1));
       case GenBinOp::Eq:
         RaiseIfNotBinFactors(expr.factors);
         return GetTrivialCmpExpr(expr.factors, CmpOp::Eq, 0, 1);

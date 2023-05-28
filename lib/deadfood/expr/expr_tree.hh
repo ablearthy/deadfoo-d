@@ -16,6 +16,7 @@ enum class GenBinOp {
   Mul,
   Div,
   Eq,
+  NotEq,
   LT,
   LE,
   GE,
