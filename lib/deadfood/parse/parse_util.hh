@@ -49,4 +49,14 @@ inline void ParseSymbol(It& it, const It end, lex::Symbol symbol) {
   }
 }
 
+template <std::forward_iterator It>
+inline int ParseInt(It& it, const It end) {
+  if (it == end || !std::holds_alternative<int>(*it)) {
+    throw ParserError("expected int");
+  }
+  auto ret = std::get<int>(*it);
+  ++it;
+  return ret;
+}
+
 }  // namespace deadfood::parse::util
