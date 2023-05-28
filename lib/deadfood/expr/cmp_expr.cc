@@ -87,7 +87,6 @@ core::FieldVariant CmpExpr::Eval() {
             }
           }
           throw std::runtime_error("cannot compare string and not string");
-          return false;
         } else if constexpr (std::is_same_v<T, core::null_t>) {
           return std::holds_alternative<core::null_t>(rhs);
         }
