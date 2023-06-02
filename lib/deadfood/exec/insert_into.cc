@@ -72,15 +72,29 @@ void ExecuteInsertQuery(Database& db, const query::InsertQuery& query) {
 
   auto actual_values = RetrieveValues(schema, fields, query);
 
+  std::map<std::string, std::set<core::FieldVariant>> already_in_table;
+
+  for (const auto& row : actual_values) {
+    for (size_t i = 0; i < row.size(); ++i) {
+      if (schema.IsUnique(fields[i])) {
+        util::CheckUniquenessConstraint(db, query.table_name, fields[i],
+                                        row[i]);
+        if (already_in_table[fields[i]].contains(row[i])) {
+          throw std::runtime_error("unique key constraint violated");
+        }
+        already_in_table[fields[i]].emplace(row[i]);
+      }
+      util::CheckForeignKeyConstraintInInsertQuery(db, query.table_name,
+                                                   fields[i], row[i]);
+    }
+  }
+  already_in_table.clear();
+
   auto scan = db.GetTableScan(query.table_name);
   scan->BeforeFirst();
   for (const auto& row : actual_values) {
     scan->Insert();
     for (size_t i = 0; i < row.size(); ++i) {
-      if (schema.IsUnique(fields[i])) {
-        util::CheckUniquenessConstraint(db, query.table_name, fields[i],
-                                        row[i]);
-      }
       scan->SetField(fields[i], row[i]);
     }
   }
