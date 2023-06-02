@@ -13,6 +13,7 @@
 #include <deadfood/expr/scan_selector/simple_scan_selector.hh>
 #include <deadfood/scan/extend_scan.hh>
 #include <deadfood/exec/select/find_table_by_field.hh>
+#include <deadfood/expr/const_expr.hh>
 
 namespace deadfood::exec {
 
@@ -47,34 +48,32 @@ std::unique_ptr<scan::IScan> GetScanFromSelectQuery(
   }
 
   for (const auto& join : query.joins) {
-    std::unique_ptr<scan::IScan> tmp;
-    std::string lhs_field_name =
-        join.table_name_lhs + "." + join.field_name_lhs;
-    std::string rhs_field_name =
-        join.table_name_rhs + "." + join.field_name_rhs;
-    if (join.table_name_rhs == join.alias) {
-      std::swap(lhs_field_name, rhs_field_name);
-    } else if (join.table_name_lhs != join.alias) {
-      throw std::runtime_error("use alias instead of full name table");
-    }
-
     if (join.type == query::JoinType::Inner) {
-      tmp = std::make_unique<scan::ProductScan>(
+      std::unique_ptr<scan::IScan> tmp = std::make_unique<scan::ProductScan>(
           db.GetTableScan(join.table_name, join.alias), std::move(scan));
+      expr::ExprTreeConverter converter{
+          std::make_unique<expr::SimpleScanSelector>(tmp.get())};
       scan = std::make_unique<scan::SelectScan>(
           std::move(tmp),
-          expr::BoolExpr(std::make_unique<expr::CmpExpr>(
-              expr::CmpOp::Eq,
-              std::make_unique<expr::FieldExpr>(tmp.get(), lhs_field_name),
-              std::make_unique<expr::FieldExpr>(tmp.get(), rhs_field_name))));
+          expr::BoolExpr(converter.ConvertExprTreeToIExpr(join.predicate)));
     } else if (join.type == query::JoinType::Left) {
-      scan = std::make_unique<scan::LeftJoinScan>(
-          std::move(scan), db.GetTableScan(join.table_name, join.alias),
-          rhs_field_name, lhs_field_name);
+      std::unique_ptr<scan::LeftJoinScan> tmp =
+          std::make_unique<scan::LeftJoinScan>(
+              std::move(scan), db.GetTableScan(join.table_name, join.alias),
+              std::make_unique<expr::ConstExpr>(true));
+      expr::ExprTreeConverter converter{
+          std::make_unique<expr::SimpleScanSelector>(tmp.get())};
+      tmp->set_predicate(converter.ConvertExprTreeToIExpr(join.predicate));
+      scan = std::move(tmp);
     } else if (join.type == query::JoinType::Right) {
-      scan = std::make_unique<scan::LeftJoinScan>(
-          db.GetTableScan(join.table_name, join.alias), std::move(scan),
-          lhs_field_name, rhs_field_name);
+      std::unique_ptr<scan::LeftJoinScan> tmp =
+          std::make_unique<scan::LeftJoinScan>(
+              db.GetTableScan(join.table_name, join.alias), std::move(scan),
+              std::make_unique<expr::ConstExpr>(true));
+      expr::ExprTreeConverter converter{
+          std::make_unique<expr::SimpleScanSelector>(tmp.get())};
+      tmp->set_predicate(converter.ConvertExprTreeToIExpr(join.predicate));
+      scan = std::move(tmp);
     } else {
       throw std::runtime_error("unhandled join type");
     }

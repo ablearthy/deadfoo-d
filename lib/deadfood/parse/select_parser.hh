@@ -147,31 +147,13 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
       }
       ++it;
 
-      util::ExpectKeyword(it, end, lex::Keyword::On, "expected `ON`");
-      ++it;
-      auto lhs = util::ExpectIdentifier(it, end);
-      ++it;
-      util::ExpectSymbol(it, end, lex::Symbol::Eq, "expected `=`");
-      ++it;
-      auto rhs = util::ExpectIdentifier(it, end);
-      ++it;
+      util::ParseKeyword(it, end, lex::Keyword::On);
+      auto predicate = ParseExprTree(it, end);
 
-      auto maybe_split_left = deadfood::util::SplitOnDot(lhs);
-      auto maybe_split_right = deadfood::util::SplitOnDot(rhs);
-      if (!maybe_split_left.has_value() || !maybe_split_right.has_value() ||
-          maybe_split_left->first.empty() || maybe_split_left->second.empty() ||
-          maybe_split_right->first.empty() ||
-          maybe_split_right->second.empty()) {
-        throw ParserError("invalid tables");
-      }
-      ret.joins.emplace_back(
-          query::Join{.type = join_type.value(),
-                      .table_name = id,
-                      .alias = alias,
-                      .table_name_lhs = maybe_split_left->first,
-                      .field_name_lhs = maybe_split_left->second,
-                      .table_name_rhs = maybe_split_right->first,
-                      .field_name_rhs = maybe_split_right->second});
+      ret.joins.emplace_back(query::Join{.type = join_type.value(),
+                                         .table_name = id,
+                                         .alias = alias,
+                                         .predicate = std::move(predicate)});
     }
   }
 
