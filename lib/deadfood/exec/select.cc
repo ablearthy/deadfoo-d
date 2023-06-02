@@ -28,6 +28,9 @@ std::unique_ptr<scan::IScan> GetScanFromSource(Database& db,
         if constexpr (std::is_same_v<T, query::SelectQuery>) {
           return GetScanFromSelectQuery(db, arg);
         } else if constexpr (std::is_same_v<T, query::FromTable>) {
+          if (!db.table_names().contains(arg.table_name)) {
+            throw std::runtime_error("unknown table `" + arg.table_name + "`");
+          }
           if (arg.renamed.has_value()) {
             return db.GetTableScan(arg.table_name, arg.renamed.value());
           } else {
@@ -40,11 +43,14 @@ std::unique_ptr<scan::IScan> GetScanFromSource(Database& db,
 
 std::unique_ptr<scan::IScan> GetScanFromSelectQuery(
     Database& db, const query::SelectQuery& query) {
-  auto scan = GetScanFromSource(db, query.sources[0]);
-  for (size_t i = 1; i < query.sources.size(); ++i) {
-    std::unique_ptr<scan::IScan> tmp = std::make_unique<scan::ProductScan>(
-        GetScanFromSource(db, query.sources[i]), std::move(scan));
-    scan = std::move(tmp);
+  std::unique_ptr<scan::IScan> scan;
+  if (!query.sources.empty()) {
+    scan = GetScanFromSource(db, query.sources[0]);
+    for (size_t i = 1; i < query.sources.size(); ++i) {
+      std::unique_ptr<scan::IScan> tmp = std::make_unique<scan::ProductScan>(
+          GetScanFromSource(db, query.sources[i]), std::move(scan));
+      scan = std::move(tmp);
+    }
   }
 
   for (const auto& join : query.joins) {
@@ -83,7 +89,6 @@ std::unique_ptr<scan::IScan> GetScanFromSelectQuery(
     if (auto s = std::get_if<query::FieldSelector>(&selector)) {
       expr::ExprTreeConverter converter{
           std::make_unique<expr::SimpleScanSelector>(scan.get())};
-
       scan = std::make_unique<scan::ExtendScan>(
           std::move(scan), converter.ConvertExprTreeToIExpr(s->expr),
           s->field_name);
@@ -168,26 +173,34 @@ void ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
     }
   }
   std::cout << '\n';
-  while (scan->Next()) {
-    for (size_t i = 0; i < fields.size(); ++i) {
-      const auto value = scan->GetField(fields[i]);
-      std::visit(
-          [&](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, core::null_t>) {
-              std::cout << "NULL";
-            } else if constexpr (std::is_same_v<T, std::string>) {
-              std::cout << '\'' << arg << '\'';  // TODO: handle \n...
-            } else {
-              std::cout << arg;
-            }
-          },
-          value);
-      if (i != fields.size() - 1) {
-        std::cout << '|';
+  while (true) {
+    try {
+      if (!scan->Next()) {
+        break;
       }
+      for (size_t i = 0; i < fields.size(); ++i) {
+        const auto value = scan->GetField(fields[i]);
+
+        std::visit(
+            [&](auto&& arg) {
+              using T = std::decay_t<decltype(arg)>;
+              if constexpr (std::is_same_v<T, core::null_t>) {
+                std::cout << "NULL";
+              } else if constexpr (std::is_same_v<T, std::string>) {
+                std::cout << '\'' << arg << '\'';  // TODO: handle \n...
+              } else {
+                std::cout << arg;
+              }
+            },
+            value);
+        if (i != fields.size() - 1) {
+          std::cout << '|';
+        }
+      }
+      std::cout << '\n';
+    } catch (const std::out_of_range& ex) {
+      throw std::runtime_error("failed to execute query");
     }
-    std::cout << '\n';
   }
 }
 
