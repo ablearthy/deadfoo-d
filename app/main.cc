@@ -48,6 +48,9 @@ void ProcessQueryInternal(Database& db, const std::vector<lex::Token>& tokens) {
 }
 
 int ProcessQuery(Database& db, const std::string& query) {
+  if (query.starts_with(".exit")) {
+    return -1;
+  }
   std::vector<lex::Token> tokens;
   try {
     tokens = lex::Lex(query);
@@ -59,10 +62,7 @@ int ProcessQuery(Database& db, const std::string& query) {
     std::cout << "expected some input\n";
     return 1;
   }
-  if (std::holds_alternative<lex::Identifier>(tokens[0]) &&
-      std::get<lex::Identifier>(tokens[0]).id == ".exit") {
-    return -1;
-  }
+
   try {
     ProcessQueryInternal(db, tokens);
   } catch (const parse::ParserError& e) {
