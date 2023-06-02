@@ -76,26 +76,13 @@ query::SelectFrom ParseSource(It& it, const It end) {
     ++it;
     return ret;
   }
-  if (const auto* id = std::get_if<lex::Identifier>(&*it)) {
-    ++it;
-    if (deadfood::util::ContainsDot(id->id)) {
-      throw ParserError("invalid name of table");
-    }
-    if (it == end || !lex::IsKeyword(*it, lex::Keyword::As)) {
-      return query::FromTable{.table_name = id->id, .renamed = std::nullopt};
-    }
-    ++it;
-    if (it == end || !util::IsIdentifier(*it)) {
-      throw ParserError("alias should be valid");
-    }
-    auto rename_id = std::get<lex::Identifier>(*it);
-    if (deadfood::util::ContainsDot(rename_id.id)) {
-      throw ParserError("alias should not contain `.`");
-    }
-    ++it;
-    return query::FromTable{.table_name = id->id, .renamed = rename_id.id};
+  const auto id = util::ParseIdWithoutDot(it, end);
+  if (it == end || !lex::IsKeyword(*it, lex::Keyword::As)) {
+    return query::FromTable{.table_name = id, .renamed = std::nullopt};
   }
-  throw ParserError("expected either (SELECT ...) expression or table name");
+  ++it;
+  const auto rename_id = util::ParseIdWithoutDot(it, end);
+  return query::FromTable{.table_name = id, .renamed = rename_id};
 }
 
 }  // namespace
@@ -103,8 +90,8 @@ query::SelectFrom ParseSource(It& it, const It end) {
 template <std::forward_iterator It>
 inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
   query::SelectQuery ret;
-  util::ExpectKeyword(it, end, lex::Keyword::Select, "expected `SELECT`");
-  ++it;
+  util::ParseKeyword(it, end, lex::Keyword::Select);
+
   while (it != end && !lex::IsSymbol(*it, lex::Symbol::RParen) &&
          !lex::IsKeyword(*it, lex::Keyword::From) &&
          !lex::IsKeyword(*it, lex::Keyword::Where)) {
