@@ -4,6 +4,7 @@
 #include <deadfood/lex/lex.hh>
 #include <deadfood/util/parse.hh>
 #include <deadfood/parse/expr_tree_parser.hh>
+#include <deadfood/parse/parse_util.hh>
 #include <deadfood/parse/parser_error.hh>
 #include <deadfood/util/str.hh>
 
@@ -194,9 +195,6 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
   if (lex::IsKeyword(*it, lex::Keyword::Where)) {
     ++it;
     auto predicate = ParseExprTree(it, end);
-    if (it != end) {
-      throw ParserError("not expected tokens after WHERE predicate");
-    }
     ret.predicate = std::move(predicate);
     return ret;
   }
