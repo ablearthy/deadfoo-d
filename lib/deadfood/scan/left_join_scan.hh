@@ -7,8 +7,7 @@ namespace deadfood::scan {
 
 class LeftJoinScan : public IScan {
  public:
-  LeftJoinScan(std::unique_ptr<IScan> lhs, std::unique_ptr<IScan> rhs,
-               const std::string& lhs_field_name, const std::string& rhs_field_name);
+  LeftJoinScan(std::unique_ptr<IScan> lhs, std::unique_ptr<IScan> rhs, std::unique_ptr<expr::IExpr> expr);
 
   void BeforeFirst() override;
   bool Next() override;
@@ -19,6 +18,8 @@ class LeftJoinScan : public IScan {
   void Insert() override;
   void Delete() override;
   void Close() override;
+
+  void set_predicate(std::unique_ptr<expr::IExpr> expr);
 
  private:
   std::unique_ptr<IScan> lhs_;

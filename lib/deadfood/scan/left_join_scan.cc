@@ -7,14 +7,10 @@ namespace deadfood::scan {
 
 LeftJoinScan::LeftJoinScan(std::unique_ptr<IScan> lhs,
                            std::unique_ptr<IScan> rhs,
-                           const std::string& lhs_field_name,
-                           const std::string& rhs_field_name)
+                           std::unique_ptr<expr::IExpr> expr)
     : lhs_{std::move(lhs)},
       rhs_{std::move(rhs)},
-      predicate_{expr::BoolExpr(std::make_unique<expr::CmpExpr>(
-          expr::CmpOp::Eq,
-          std::make_unique<expr::FieldExpr>(lhs_.get(), lhs_field_name),
-          std::make_unique<expr::FieldExpr>(rhs_.get(), rhs_field_name)))},
+      predicate_{expr::BoolExpr(std::move(expr))},
       lhs_has_row_{lhs_->Next()},
       cur_lhs_has_rhs_{false},
       rhs_null_{false} {}
@@ -101,6 +97,10 @@ void LeftJoinScan::Delete() {}
 void LeftJoinScan::Close() {
   lhs_->Close();
   rhs_->Close();
+}
+
+void LeftJoinScan::set_predicate(std::unique_ptr<expr::IExpr> expr) {
+  predicate_ = expr::BoolExpr(std::move(expr));
 }
 
 }  // namespace deadfood::scan
