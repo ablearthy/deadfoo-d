@@ -188,8 +188,8 @@ std::unique_ptr<scan::IScan> GetScanFromSelectQuery(
   if (!query.sources.empty()) {
     scan = GetScanFromSource(db, query.sources[0]);
     for (size_t i = 1; i < query.sources.size(); ++i) {
-      std::unique_ptr<scan::IScan> tmp = std::make_unique<scan::ProductScan>(
-          GetScanFromSource(db, query.sources[i]), std::move(scan));
+      std::unique_ptr<scan::IScan> tmp = std::make_unique<scan::ProductScan>(std::move(scan),
+          GetScanFromSource(db, query.sources[i]));
       scan = std::move(tmp);
     }
   }
