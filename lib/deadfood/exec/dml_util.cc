@@ -138,7 +138,8 @@ void CheckForeignKeyConstraintInInsertQuery(Database& db,
   const auto& schema = db.schemas().at(table_name);
   for (const auto& constraint : db.constraints()) {
     if (auto c = std::get_if<core::ReferencesConstraint>(&constraint)) {
-      if (c->slave_table != table_name || !schema.Exists(c->slave_field)) {
+      if (c->slave_table != table_name || c->slave_field != field_name ||
+          !schema.Exists(c->slave_field)) {
         continue;
       }
       if (CountRowsWithMatchingField(db, c->master_table, c->master_field,
