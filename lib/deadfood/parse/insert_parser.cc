@@ -40,7 +40,7 @@ query::InsertQuery ParseInsertQueryInternal(It& it, const It end) {
       auto expr = ParseExprTree(it, end);
       row.emplace_back(std::move(expr));
 
-      if (lex::IsSymbol(*it, lex::Symbol::Comma)) {
+      if (it != end && lex::IsSymbol(*it, lex::Symbol::Comma)) {
         util::ParseSymbol(it, end, lex::Symbol::Comma);
       } else {
         break;
@@ -49,7 +49,7 @@ query::InsertQuery ParseInsertQueryInternal(It& it, const It end) {
     values.emplace_back(std::move(row));
     util::ParseSymbol(it, end, lex::Symbol::RParen);
 
-    if (lex::IsSymbol(*it, lex::Symbol::Comma)) {
+    if (it != end && lex::IsSymbol(*it, lex::Symbol::Comma)) {
       util::ParseSymbol(it, end, lex::Symbol::Comma);
     } else {
       break;
