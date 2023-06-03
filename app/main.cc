@@ -40,7 +40,46 @@ void ProcessQueryInternal(Database& db, const std::vector<lex::Token>& tokens) {
     exec::ExecuteInsertQuery(db, q);
   } else if (IsKeyword(tokens[0], lex::Keyword::Select)) {  // select query
     const auto q = parse::ParseSelectQuery(tokens);
-    exec::ExecuteSelectQuery(db, q);
+    auto [scan, fields] = exec::ExecuteSelectQuery(db, q);
+    scan->BeforeFirst();
+    for (size_t i = 0; i < fields.size(); ++i) {
+      std::cout << fields[i];
+      if (i != fields.size() - 1) {
+        std::cout << '|';
+      }
+    }
+
+    std::cout << '\n';
+
+    while (true) {
+      try {
+        if (!scan->Next()) {
+          break;
+        }
+        for (size_t i = 0; i < fields.size(); ++i) {
+          const auto value = scan->GetField(fields[i]);
+
+          std::visit(
+              [&](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, core::null_t>) {
+                  std::cout << "NULL";
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                  std::cout << '\'' << arg << '\'';  // TODO: handle \n...
+                } else {
+                  std::cout << arg;
+                }
+              },
+              value);
+          if (i != fields.size() - 1) {
+            std::cout << '|';
+          }
+        }
+        std::cout << '\n';
+      } catch (const std::exception& ex) {
+        throw std::runtime_error("failed to execute query");
+      }
+    }
   } else {
     std::cout << "unknown query\n";
     return;
