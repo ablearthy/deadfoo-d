@@ -579,13 +579,14 @@ TEST(ComplexExpr, db) {
 
   ASSERT_TRUE(scan->Next());
   ASSERT_EQ(scan->GetField("test_tbl.a"),
-            core::FieldVariant(static_cast<int>(4)));
-  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(4)));
+            core::FieldVariant(static_cast<int>(3)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(9)));
 
   ASSERT_TRUE(scan->Next());
   ASSERT_EQ(scan->GetField("test_tbl.a"),
-            core::FieldVariant(static_cast<int>(3)));
-  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(9)));
+            core::FieldVariant(static_cast<int>(4)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(4)));
+
   ASSERT_FALSE(scan->Next());
 }
 
