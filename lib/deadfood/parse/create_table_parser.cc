@@ -147,6 +147,9 @@ ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
       auto constraint =
           ParseReferencesConstraint(table_name, it, tokens.cend());
       constraints.emplace_back(std::move(constraint));
+      if (it != end && lex::IsSymbol(*it, lex::Symbol::Comma)) {
+        ++it;
+      }
     } else {
       const auto field = ParseField(it, tokens.cend());
       if (query.Contains(field.name)) {
@@ -154,7 +157,7 @@ ParseCreateTableQuery(const std::vector<lex::Token>& tokens) {
       }
       query.AddField(field.name, field.type, field.is_unique,
                      field.may_be_null);
-      if (lex::IsSymbol(*it, lex::Symbol::Comma)) {
+      if (it != end && lex::IsSymbol(*it, lex::Symbol::Comma)) {
         ++it;
       }
     }
