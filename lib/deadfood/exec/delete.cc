@@ -25,6 +25,9 @@ void ExecuteDeleteQuery(Database& db, const query::DeleteQuery& query) {
   while (scan->Next()) {
     util::CheckForeignKeyConstraintForRow(db, scan.get(), query.table_name,
                                           util::Action::Delete);
+  }
+  scan->BeforeFirst();
+  while (scan->Next()) {
     scan->Delete();
   }
 }
