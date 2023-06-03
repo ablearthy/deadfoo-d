@@ -131,4 +131,23 @@ void CheckForeignKeyConstraintForRow(Database& db, scan::IScan* scan,
   }
 }
 
+void CheckForeignKeyConstraintInInsertQuery(Database& db,
+                                            const std::string& table_name,
+                                            const std::string& field_name,
+                                            const core::FieldVariant& value) {
+  const auto& schema = db.schemas().at(table_name);
+  for (const auto& constraint : db.constraints()) {
+    if (auto c = std::get_if<core::ReferencesConstraint>(&constraint)) {
+      if (c->slave_table != table_name || c->slave_field != field_name ||
+          !schema.Exists(c->slave_field)) {
+        continue;
+      }
+      if (CountRowsWithMatchingField(db, c->master_table, c->master_field,
+                                     value, 1) == 0) {
+        throw std::runtime_error("foreign key constraint violated");
+      }
+    }
+  }
+}
+
 }  // namespace deadfood::exec::util

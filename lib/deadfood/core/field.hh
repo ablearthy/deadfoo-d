@@ -21,7 +21,11 @@ class Field {
   size_t size_;
 };
 
-struct null_t {};
+struct null_t {
+  bool operator==(const null_t&) const { return true; }
+  bool operator!=(const null_t&) const { return false; }
+  bool operator<(const null_t&) const { return false; }
+};
 
 using FieldVariant =
     std::variant<bool, int, float, double, std::string, null_t>;

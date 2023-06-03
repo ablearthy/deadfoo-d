@@ -28,9 +28,10 @@ inline std::pair<std::optional<std::string>, std::string> ParseFullFieldName(
 }
 
 template <std::forward_iterator It>
-inline void ParseKeyword(It& it, const It end, lex::Keyword keyword) {
+inline lex::Keyword ParseKeyword(It& it, const It end, lex::Keyword keyword) {
   if (it != end && lex::IsKeyword(*it, keyword)) {
     ++it;
+    return keyword;
   } else {
     throw ParserError("expected keyword `" +
                       lex::util::GetStringByKeyword(keyword) + "`");
@@ -38,9 +39,10 @@ inline void ParseKeyword(It& it, const It end, lex::Keyword keyword) {
 }
 
 template <std::forward_iterator It>
-inline void ParseSymbol(It& it, const It end, lex::Symbol symbol) {
+inline lex::Symbol ParseSymbol(It& it, const It end, lex::Symbol symbol) {
   if (it != end && lex::IsSymbol(*it, symbol)) {
     ++it;
+    return symbol;
   } else {
     std::string ret = "expected symbol `";
     ret += lex::util::GetCharBySymbol(symbol);

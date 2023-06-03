@@ -47,7 +47,15 @@ double ByteBuffer::ReadDouble(size_t offset) const {
 }
 
 std::string ByteBuffer::ReadVarchar(size_t offset, size_t count) const {
-  return {storage_.get() + offset, count};
+  std::string ret;
+  for (size_t i = 0; i < count; ++i) {
+    if (storage_[i + offset]) {
+      ret += storage_[i + offset];
+    } else {
+      break;
+    }
+  }
+  return ret;
 }
 
 void ByteBuffer::WriteBool(size_t offset, bool value) {
