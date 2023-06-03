@@ -5,6 +5,7 @@
 
 namespace deadfood::exec {
 
-void ExecuteSelectQuery(Database& db, const query::SelectQuery& query);
+std::pair<std::unique_ptr<scan::IScan>, std::vector<std::string>>
+ExecuteSelectQuery(Database& db, const query::SelectQuery& query);
 
 }

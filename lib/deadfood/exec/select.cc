@@ -1,7 +1,5 @@
 #include "select.hh"
 
-#include <iostream>
-
 #include <deadfood/scan/iscan.hh>
 #include <deadfood/scan/product_scan.hh>
 #include <deadfood/expr/bool_expr.hh>
@@ -293,50 +291,15 @@ struct ObtainAllFieldsVisitor {
   }
 };
 
-void ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
+std::pair<std::unique_ptr<scan::IScan>, std::vector<std::string>>
+ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
   X{.db = db}(query);
   auto scan = GetScanFromSelectQuery(db, query);
 
   ObtainAllFieldsVisitor vis{db};
   std::vector<std::string> fields = vis(query);
-
   scan->BeforeFirst();
-  for (size_t i = 0; i < fields.size(); ++i) {
-    std::cout << fields[i];
-    if (i != fields.size() - 1) {
-      std::cout << '|';
-    }
-  }
-  std::cout << '\n';
-  while (true) {
-    try {
-      if (!scan->Next()) {
-        break;
-      }
-      for (size_t i = 0; i < fields.size(); ++i) {
-        const auto value = scan->GetField(fields[i]);
-
-        std::visit(
-            [&](auto&& arg) {
-              using T = std::decay_t<decltype(arg)>;
-              if constexpr (std::is_same_v<T, core::null_t>) {
-                std::cout << "NULL";
-              } else if constexpr (std::is_same_v<T, std::string>) {
-                std::cout << '\'' << arg << '\'';  // TODO: handle \n...
-              } else {
-                std::cout << arg;
-              }
-            },
-            value);
-        if (i != fields.size() - 1) {
-          std::cout << '|';
-        }
-      }
-      std::cout << '\n';
-    } catch (const std::exception& ex) {
-      throw std::runtime_error("failed to execute query");
-    }
-  }
+  return {std::move(scan), fields};
 }
 
 }  // namespace deadfood::exec
