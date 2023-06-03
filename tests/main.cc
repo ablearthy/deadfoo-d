@@ -375,4 +375,218 @@ TEST(DeleteForeignKeyGood, db) {
   ASSERT_FALSE(scan->Next());
 }
 
+TEST(DeleteAll, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "DELETE FROM test_tbl");
+  auto result =
+      ProcessQueryInternal(db, "SELECT first_name, last_name FROM test_tbl");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(SelectLeftJoin, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY "
+                       "KEY, song INT)");
+  ProcessQueryInternal(db,
+                       "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), "
+                       "('John', 'Lennon'), ('Noname', '')");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl2 VALUES ('Egor', 5), ('Noname', 100)");
+  auto result = ProcessQueryInternal(
+      db,
+      "SELECT first_name, last_name, song FROM test_tbl LEFT JOIN test_tbl2 t "
+      "ON t.name = test_tbl.first_name");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Egor")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Letov")));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(static_cast<int>(5)));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("John")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Lennon")));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(core::null_t{}));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Noname")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("")));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(static_cast<int>(100)));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(SelectInnerJoin, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY "
+                       "KEY, song INT)");
+  ProcessQueryInternal(db,
+                       "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), "
+                       "('John', 'Lennon'), ('Noname', '')");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl2 VALUES ('Egor', 5), ('Noname', 100)");
+  auto result = ProcessQueryInternal(
+      db,
+      "SELECT first_name, last_name, song FROM test_tbl JOIN test_tbl2 t "
+      "ON t.name = test_tbl.first_name");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Egor")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Letov")));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(static_cast<int>(5)));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Noname")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("")));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(static_cast<int>(100)));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(SelectRightJoin, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl2 (name VARCHAR(255), song INT)");
+  ProcessQueryInternal(db,
+                       "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), "
+                       "('John', 'Lennon'), ('Noname', '')");
+  ProcessQueryInternal(db,
+                       "INSERT INTO test_tbl2 VALUES ('Egor', 5), ('Noname', "
+                       "100), ('Blaha', 555)");
+  auto result = ProcessQueryInternal(db,
+                                     "SELECT first_name, last_name, name, song "
+                                     "FROM test_tbl RIGHT JOIN test_tbl2 t "
+                                     "ON t.name = test_tbl.first_name");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Egor")));
+  ASSERT_EQ(scan->GetField("name"),
+            core::FieldVariant(static_cast<std::string>("Egor")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Letov")));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(static_cast<int>(5)));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Noname")));
+  ASSERT_EQ(scan->GetField("name"),
+            core::FieldVariant(static_cast<std::string>("Noname")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("")));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(static_cast<int>(100)));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"), core::FieldVariant(core::null_t{}));
+  ASSERT_EQ(scan->GetField("name"),
+            core::FieldVariant(static_cast<std::string>("Blaha")));
+  ASSERT_EQ(scan->GetField("last_name"), core::FieldVariant(core::null_t{}));
+  ASSERT_EQ(scan->GetField("song"), core::FieldVariant(static_cast<int>(555)));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(SelectCartesianProduct, db) {
+  Database db;
+  ProcessQueryInternal(db, "CREATE TABLE test_tbl (a INT)");
+  ProcessQueryInternal(db,
+                       "INSERT INTO test_tbl VALUES (1), (2), (3), (4), (5), "
+                       "(6), (7), (8), (9)");
+  auto result =
+      ProcessQueryInternal(db,
+                           "SELECT test_tbl.a, t.a FROM test_tbl, test_tbl as "
+                           "t WHERE test_tbl.a * test_tbl.a = t.a");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(1)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(1)));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(2)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(4)));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(3)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(9)));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(AndExpr, db) {
+  Database db;
+  ProcessQueryInternal(db, "CREATE TABLE test_tbl (a INT)");
+  ProcessQueryInternal(db,
+                       "INSERT INTO test_tbl VALUES (1), (2), (3), (4), (5), "
+                       "(6), (7), (8), (9)");
+  auto result = ProcessQueryInternal(
+      db,
+      "SELECT test_tbl.a, t.a FROM test_tbl, test_tbl as t WHERE test_tbl.a * "
+      "test_tbl.a = t.a AND test_tbl.a != 1");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(2)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(4)));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(3)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(9)));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(ComplexExpr, db) {
+  Database db;
+  ProcessQueryInternal(db, "CREATE TABLE test_tbl (a INT)");
+  ProcessQueryInternal(db,
+                       "INSERT INTO test_tbl VALUES (1), (2), (3), (4), (5), "
+                       "(6), (7), (8), (9)");
+  auto result = ProcessQueryInternal(db,
+                                     R"(
+      SELECT test_tbl.a, t.a
+      FROM test_tbl, test_tbl AS t
+      WHERE (test_tbl.a * test_tbl.a = t.a OR (test_tbl.a = 4 AND t.a = 4)) AND (test_tbl.a != 1)
+    )");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(2)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(4)));
+
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(4)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(4)));
+
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("test_tbl.a"),
+            core::FieldVariant(static_cast<int>(3)));
+  ASSERT_EQ(scan->GetField("t.a"), core::FieldVariant(static_cast<int>(9)));
+  ASSERT_FALSE(scan->Next());
+}
+
 }  // namespace deadfood::tests
