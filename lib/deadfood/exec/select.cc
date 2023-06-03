@@ -15,7 +15,150 @@
 #include <deadfood/exec/select/find_table_by_field.hh>
 #include <deadfood/expr/const_expr.hh>
 
+#include <deadfood/util/str.hh>
+
 namespace deadfood::exec {
+
+void CheckIfFieldExists(const Database& db,
+                        const std::map<std::string, size_t>& variables,
+                        const std::map<std::string, std::string>& aliases,
+                        const std::string& value) {
+  if (auto s = util::SplitOnDot(value)) {
+    const auto& [table_name, field_name] = s.value();
+    if (db.table_names().contains(table_name)) {
+      if (!db.schemas().at(table_name).Exists(field_name)) {
+        throw std::runtime_error("variable `" + value + "` is not in scope");
+      }
+    } else if (aliases.contains(table_name)) {
+      if (!db.schemas().at(aliases.at(table_name)).Exists(field_name)) {
+        throw std::runtime_error("variable `" + value + "` is not in scope");
+      }
+    } else {
+      throw std::runtime_error("unknown table name");
+    }
+  } else {
+    if (!variables.contains(value)) {
+      throw std::runtime_error("variable `" + value + "` is not in scope");
+    }
+    if (variables.at(value) > 1) {
+      throw std::runtime_error("variable `" + value + "` is ambiguous");
+    }
+  }
+}
+
+struct Y {
+  const Database& db;
+  const std::map<std::string, size_t>& variables;
+  const std::map<std::string, std::string>& aliases;
+
+  void operator()(const expr::ExprTree& expr) const {
+    for (const auto& v : expr.factors) {
+      std::visit(*this, v.factor);
+    }
+  }
+
+  void operator()(const expr::ExprId& expr) const {
+    CheckIfFieldExists(db, variables, aliases, expr.id);
+  }
+
+  void operator()(const expr::Constant& expr) const {}
+};
+
+struct X {
+  Database& db;
+  std::map<std::string, size_t> variables;
+  std::map<std::string, std::string> aliases;
+
+  void operator()(const query::SelectQuery& query) {
+    for (const auto& source : query.sources) {
+      std::visit(*this, source);
+    }
+    auto select_from_variables = variables;
+    for (const auto& source : query.sources) {
+      if (auto* r = std::get_if<query::FromTable>(&source)) {
+        for (const auto& field_name : db.schemas().at(r->table_name).fields()) {
+          ++select_from_variables[field_name];
+        }
+      }
+    }
+
+    for (const auto& join : query.joins) {
+      operator()(query::FromTable{.table_name = join.table_name,
+                                  .renamed = join.alias});
+      std::visit(Y{db, variables, aliases}, join.predicate.factor);
+
+      for (const auto& field_name : db.schemas().at(join.table_name).fields()) {
+        ++select_from_variables[field_name];
+      }
+    }
+
+    for (const auto& selector : query.selectors) {
+      std::visit(
+          [&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<T, std::string>) {
+              CheckIfFieldExists(db, select_from_variables, aliases, arg);
+            } else if constexpr (std::is_same_v<T, query::FieldSelector>) {
+              if (select_from_variables.contains(arg.field_name)) {
+                throw std::runtime_error("variable `" + arg.field_name +
+                                         "` introduces ambiguity");
+              }
+              std::visit(Y{db, select_from_variables, aliases},
+                         arg.expr.factor);
+            }
+          },
+          selector);
+    }
+
+    for (const auto& selector : query.selectors) {
+      std::visit(
+          [&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<T, query::FieldSelector>) {
+              ++variables[arg.field_name];
+            } else if constexpr (std::is_same_v<T, std::string>) {
+              ++variables[arg];
+            } else if constexpr (std::is_same_v<T, query::SelectAllSelector>) {
+              for (const auto& source : query.sources) {
+                if (auto* r = std::get_if<query::FromTable>(&source)) {
+                  for (const auto& field_name :
+                       db.schemas().at(r->table_name).fields()) {
+                    if (!variables.contains(field_name)) {
+                      ++variables[field_name];
+                    }
+                  }
+                }
+              }
+            }
+          },
+          selector);
+    }
+
+    if (query.predicate.has_value()) {
+      std::visit(Y{db, variables, aliases}, query.predicate.value().factor);
+    }
+  }
+
+  void operator()(const query::FromTable& query) {
+    if (!db.Exists(query.table_name)) {
+      throw std::runtime_error("table `" + query.table_name +
+                               "` does not exist");
+    }
+    if (aliases.contains(query.table_name)) {
+      throw std::runtime_error("alias with name `" + query.table_name +
+                               "` already exists (collision with table name)");
+    }
+    if (query.renamed.has_value()) {
+      if (db.Exists(query.renamed.value())) {
+        throw std::runtime_error("alias `" + query.renamed.value() +
+                                 "` introduces ambiguity");
+      }
+      aliases.emplace(query.renamed.value(), query.table_name);
+    }
+  }
+};
 
 std::unique_ptr<scan::IScan> GetScanFromSelectQuery(
     Database& db, const query::SelectQuery& query);
@@ -139,17 +282,8 @@ struct ObtainAllFieldsVisitor {
                 ret.insert(ret.end(), inner_fields.begin(), inner_fields.end());
               }
             } else if constexpr (std::is_same_v<T, std::string>) {
-              if (const auto c = FindTableByField(db.schemas(), query, sel)) {
-                ret.emplace_back(c->full_field_name);
-              } else {
-                ret.emplace_back(sel);
-              }
+              ret.emplace_back(sel);
             } else if constexpr (std::is_same_v<T, query::FieldSelector>) {
-              if (FindTableByField(db.schemas(), query, sel.field_name)
-                      .has_value()) {
-                throw std::runtime_error("ambiguous source for `" +
-                                         sel.field_name + "` field");
-              }
               ret.emplace_back(sel.field_name);
             }
           },
@@ -160,6 +294,7 @@ struct ObtainAllFieldsVisitor {
 };
 
 void ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
+  X{.db = db}(query);
   auto scan = GetScanFromSelectQuery(db, query);
 
   ObtainAllFieldsVisitor vis{db};
@@ -198,7 +333,7 @@ void ExecuteSelectQuery(Database& db, const query::SelectQuery& query) {
         }
       }
       std::cout << '\n';
-    } catch (const std::out_of_range& ex) {
+    } catch (const std::exception& ex) {
       throw std::runtime_error("failed to execute query");
     }
   }

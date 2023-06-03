@@ -127,6 +127,9 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
       }
     }
 
+    if (ret.sources.empty()) {
+      throw ParserError("expected at least one source after `FROM`");
+    }
     if (it == end) {
       return ret;
     }
