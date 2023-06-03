@@ -30,10 +30,6 @@ void Schema::AddField(const std::string& field_name, const Field& field,
     return;
   }
 
-  indices_.emplace(field_name, fields_.size());
-  fields_.emplace_back(field_name);
-  field_info_.emplace(field_name, field);
-
   if (fields_.size() > 8 * data_offset_) {
     ++data_offset_;
   }
@@ -41,8 +37,14 @@ void Schema::AddField(const std::string& field_name, const Field& field,
   if (offsets_.empty()) {
     offsets_.emplace_back(0);
   } else {
-    offsets_.emplace_back(offsets_.back() + field.size());
+    offsets_.emplace_back(offsets_.back() +
+                          field_info_.at(fields_.back()).size());
   }
+
+  indices_.emplace(field_name, fields_.size());
+  fields_.emplace_back(field_name);
+  field_info_.emplace(field_name, field);
+
   offset_map_.emplace(field_name, offsets_.back());
   may_be_null_.emplace(field_name, may_be_null);
   is_unique_.emplace(field_name, is_unique);

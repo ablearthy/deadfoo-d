@@ -151,7 +151,7 @@ void Dump(const Database& db, const std::filesystem::path& path) {
 
 std::map<std::string, core::Schema> LoadSchemas(std::istream& stream) {
   std::map<std::string, core::Schema> map;
-  while (stream.peek(), !stream.eof()) {
+  while (stream.peek(), !(stream.eof() || stream.fail())) {
     const auto table_name = binary::GetCString(stream);
     const uint32_t fields_count = binary::GetUint<uint32_t>(stream);
     core::Schema schema;
@@ -175,7 +175,7 @@ std::map<std::string, core::Schema> LoadSchemas(std::istream& stream) {
 std::vector<core::Constraint> LoadConstraint(std::istream& stream) {
   std::vector<core::Constraint> ret;
 
-  while (stream.peek(), !stream.eof()) {
+  while (stream.peek(), !(stream.eof() || stream.fail())) {
     const auto slave_table = binary::GetCString(stream);
     const auto slave_field = binary::GetCString(stream);
     const auto master_table = binary::GetCString(stream);
@@ -196,7 +196,7 @@ std::vector<core::Constraint> LoadConstraint(std::istream& stream) {
 storage::TableStorage LoadTable(std::istream& stream, const size_t row_size) {
   storage::TableStorage storage;
   auto& internal_storage = storage.storage();
-  while (stream.peek(), !stream.eof()) {
+  while (stream.peek(), !(stream.eof() || stream.fail())) {
     const size_t rowid = binary::GetUint<size_t>(stream);
     auto ptr = binary::GetBytes(stream, row_size);
     internal_storage.emplace(rowid,

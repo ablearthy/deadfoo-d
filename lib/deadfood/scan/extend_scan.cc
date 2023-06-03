@@ -5,16 +5,36 @@ namespace deadfood::scan {
 ExtendScan::ExtendScan(std::unique_ptr<IScan> internal,
                        std::unique_ptr<expr::IExpr> expr,
                        const std::string& name)
-    : internal_{std::move(internal)}, expr_{std::move(expr)}, name_{name} {}
+    : internal_{std::move(internal)},
+      expr_{std::move(expr)},
+      name_{name},
+      before_first_{true} {}
 
-void ExtendScan::BeforeFirst() { internal_->BeforeFirst(); }
-bool ExtendScan::Next() { return internal_->Next(); }
+void ExtendScan::BeforeFirst() {
+  if (internal_ != nullptr) {
+    internal_->BeforeFirst();
+  }
+  before_first_ = true;
+}
+bool ExtendScan::Next() {
+  if (internal_ != nullptr) {
+    return internal_->Next();
+  }
+  if (before_first_) {
+    before_first_ = false;
+    return true;
+  }
+  return false;
+}
 
 bool ExtendScan::HasField(const std::string& field_name) const {
   if (field_name == name_) {
     return true;
   }
-  return internal_->HasField(field_name);
+  if (internal_ != nullptr) {
+    return internal_->HasField(field_name);
+  }
+  return false;
 }
 
 core::FieldVariant ExtendScan::GetField(const std::string& field_name) const {

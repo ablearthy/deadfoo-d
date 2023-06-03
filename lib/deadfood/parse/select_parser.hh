@@ -4,6 +4,7 @@
 #include <deadfood/lex/lex.hh>
 #include <deadfood/util/parse.hh>
 #include <deadfood/parse/expr_tree_parser.hh>
+#include <deadfood/parse/parse_util.hh>
 #include <deadfood/parse/parser_error.hh>
 #include <deadfood/util/str.hh>
 
@@ -75,26 +76,13 @@ query::SelectFrom ParseSource(It& it, const It end) {
     ++it;
     return ret;
   }
-  if (const auto* id = std::get_if<lex::Identifier>(&*it)) {
-    ++it;
-    if (deadfood::util::ContainsDot(id->id)) {
-      throw ParserError("invalid name of table");
-    }
-    if (it == end || !lex::IsKeyword(*it, lex::Keyword::As)) {
-      return query::FromTable{.table_name = id->id, .renamed = std::nullopt};
-    }
-    ++it;
-    if (it == end || !util::IsIdentifier(*it)) {
-      throw ParserError("alias should be valid");
-    }
-    auto rename_id = std::get<lex::Identifier>(*it);
-    if (deadfood::util::ContainsDot(rename_id.id)) {
-      throw ParserError("alias should not contain `.`");
-    }
-    ++it;
-    return query::FromTable{.table_name = id->id, .renamed = rename_id.id};
+  const auto id = util::ParseIdWithoutDot(it, end);
+  if (it == end || !lex::IsKeyword(*it, lex::Keyword::As)) {
+    return query::FromTable{.table_name = id, .renamed = std::nullopt};
   }
-  throw ParserError("expected either (SELECT ...) expression or table name");
+  ++it;
+  const auto rename_id = util::ParseIdWithoutDot(it, end);
+  return query::FromTable{.table_name = id, .renamed = rename_id};
 }
 
 }  // namespace
@@ -102,8 +90,8 @@ query::SelectFrom ParseSource(It& it, const It end) {
 template <std::forward_iterator It>
 inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
   query::SelectQuery ret;
-  util::ExpectKeyword(it, end, lex::Keyword::Select, "expected `SELECT`");
-  ++it;
+  util::ParseKeyword(it, end, lex::Keyword::Select);
+
   while (it != end && !lex::IsSymbol(*it, lex::Symbol::RParen) &&
          !lex::IsKeyword(*it, lex::Keyword::From) &&
          !lex::IsKeyword(*it, lex::Keyword::Where)) {
@@ -139,6 +127,9 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
       }
     }
 
+    if (ret.sources.empty()) {
+      throw ParserError("expected at least one source after `FROM`");
+    }
     if (it == end) {
       return ret;
     }
@@ -159,31 +150,13 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
       }
       ++it;
 
-      util::ExpectKeyword(it, end, lex::Keyword::On, "expected `ON`");
-      ++it;
-      auto lhs = util::ExpectIdentifier(it, end);
-      ++it;
-      util::ExpectSymbol(it, end, lex::Symbol::Eq, "expected `=`");
-      ++it;
-      auto rhs = util::ExpectIdentifier(it, end);
-      ++it;
+      util::ParseKeyword(it, end, lex::Keyword::On);
+      auto predicate = ParseExprTree(it, end);
 
-      auto maybe_split_left = deadfood::util::SplitOnDot(lhs);
-      auto maybe_split_right = deadfood::util::SplitOnDot(rhs);
-      if (!maybe_split_left.has_value() || !maybe_split_right.has_value() ||
-          maybe_split_left->first.empty() || maybe_split_left->second.empty() ||
-          maybe_split_right->first.empty() ||
-          maybe_split_right->second.empty()) {
-        throw ParserError("invalid tables");
-      }
-      ret.joins.emplace_back(
-          query::Join{.type = join_type.value(),
-                      .table_name = id,
-                      .alias = alias,
-                      .table_name_lhs = maybe_split_left->first,
-                      .field_name_lhs = maybe_split_left->second,
-                      .table_name_rhs = maybe_split_right->first,
-                      .field_name_rhs = maybe_split_right->second});
+      ret.joins.emplace_back(query::Join{.type = join_type.value(),
+                                         .table_name = id,
+                                         .alias = alias,
+                                         .predicate = std::move(predicate)});
     }
   }
 
@@ -194,9 +167,6 @@ inline query::SelectQuery ParseSelectQuery(It& it, const It end) {
   if (lex::IsKeyword(*it, lex::Keyword::Where)) {
     ++it;
     auto predicate = ParseExprTree(it, end);
-    if (it != end) {
-      throw ParserError("not expected tokens after WHERE predicate");
-    }
     ret.predicate = std::move(predicate);
     return ret;
   }

@@ -22,6 +22,7 @@ class ExtendScan : public IScan {
   std::unique_ptr<IScan> internal_;
   std::unique_ptr<expr::IExpr> expr_;
   std::string name_;
+  bool before_first_;
 };
 
 }  // namespace deadfood::scan

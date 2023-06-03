@@ -40,7 +40,9 @@ void ExecuteUpdateQuery(Database& db, const query::UpdateQuery& query) {
     expression_map.emplace(field_name, conv.ConvertExprTreeToIExpr(expr_tree));
   }
 
+  std::vector<std::map<std::string, core::FieldVariant>> updated_values;
   while (scan->Next()) {
+    std::map<std::string, core::FieldVariant> row;
     for (const auto& [field_name, expr] : expression_map) {
       auto value = expr->Eval();
       const auto field_info = schema.field_info(field_name);
@@ -52,9 +54,18 @@ void ExecuteUpdateQuery(Database& db, const query::UpdateQuery& query) {
       util::CheckForeignKeyConstraint(db, query.table_name, field_name,
                                       scan->GetField(field_name),
                                       util::Action::Update);
-      scan->SetField(field_name,
-                     util::NormalizeFieldVariant(field_info.type(), value));
+      row.emplace(field_name,
+                  util::NormalizeFieldVariant(field_info.type(), value));
     }
+    updated_values.emplace_back(std::move(row));
+  }
+  scan->BeforeFirst();
+  auto it = updated_values.begin();
+  while (scan->Next()) {
+    for (const auto& [field_name, value] : *it) {
+      scan->SetField(field_name, value);
+    }
+    ++it;
   }
 }
 

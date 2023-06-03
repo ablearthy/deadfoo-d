@@ -26,4 +26,9 @@ void CheckForeignKeyConstraintForRow(Database& db, scan::IScan* scan,
                                      const std::string& table_name,
                                      const Action& action);
 
+void CheckForeignKeyConstraintInInsertQuery(Database& db,
+                                            const std::string& table_name,
+                                            const std::string& field_name,
+                                            const core::FieldVariant& value);
+
 }  // namespace deadfood::exec::util
