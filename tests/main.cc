@@ -188,8 +188,191 @@ TEST(ForeignKeyInsertGood, db) {
       db,
       "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY KEY, song INT, "
       "FOREIGN KEY name REFERENCES test_tbl (first_name))");
-  ProcessQueryInternal(db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
   ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('Egor', 5)");
+}
+
+TEST(ForeignKeyUpdateGood, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db,
+      "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY KEY, song INT, "
+      "FOREIGN KEY name REFERENCES test_tbl (first_name))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('Egor', 5)");
+  ProcessQueryInternal(
+      db, "UPDATE test_tbl SET first_name = 'Blah' WHERE first_name = 'John'");
+}
+
+TEST(ForeignKeyUpdateFail, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db,
+      "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY KEY, song INT, "
+      "FOREIGN KEY name REFERENCES test_tbl (first_name))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('Egor', 5)");
+  ASSERT_THROW(
+      ProcessQueryInternal(
+          db,
+          "UPDATE test_tbl SET first_name = 'Blah' WHERE first_name = 'Egor'"),
+      std::runtime_error);
+}
+
+TEST(ForeignKeyDeleteGood, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db,
+      "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY KEY, song INT, "
+      "FOREIGN KEY name REFERENCES test_tbl (first_name))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('Egor', 5)");
+  ProcessQueryInternal(db, "DELETE FROM test_tbl WHERE first_name = 'John'");
+}
+
+TEST(ForeignKeyDeleteFail, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db,
+      "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY KEY, song INT, "
+      "FOREIGN KEY name REFERENCES test_tbl (first_name))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('Egor', 5)");
+  ASSERT_THROW(ProcessQueryInternal(
+                   db, "DELETE FROM test_tbl WHERE first_name = 'Egor'"),
+               std::runtime_error);
+}
+
+TEST(UpdateGood, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(
+      db, "UPDATE test_tbl SET first_name = 'Blah' WHERE first_name = 'John'");
+  auto result =
+      ProcessQueryInternal(db, "SELECT first_name, last_name FROM test_tbl");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Egor")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Letov")));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Blah")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Lennon")));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(UpdateForeignKeyFail, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db,
+      "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY "
+      "KEY, song INT, FOREIGN KEY name REFERENCES test_tbl (first_name))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('John', 42)");
+  ASSERT_THROW(
+      ProcessQueryInternal(db, "UPDATE test_tbl SET first_name = 'Blah'"),
+      std::runtime_error);
+  auto result =
+      ProcessQueryInternal(db, "SELECT first_name, last_name FROM test_tbl");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Egor")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Letov")));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("John")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Lennon")));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(DeleteForeignKeyFail, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db,
+      "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY "
+      "KEY, song INT, FOREIGN KEY name REFERENCES test_tbl (first_name))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('John', 42)");
+  ASSERT_THROW(ProcessQueryInternal(
+                   db, "DELETE FROM test_tbl WHERE first_name = 'John'"),
+               std::runtime_error);
+  auto result =
+      ProcessQueryInternal(db, "SELECT first_name, last_name FROM test_tbl");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("Egor")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Letov")));
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("John")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Lennon")));
+  ASSERT_FALSE(scan->Next());
+}
+
+TEST(DeleteForeignKeyGood, db) {
+  Database db;
+  ProcessQueryInternal(db,
+                       "CREATE TABLE test_tbl (first_name VARCHAR(255) PRIMARY "
+                       "KEY, last_name VARCHAR(255))");
+  ProcessQueryInternal(
+      db,
+      "CREATE TABLE test_tbl2 (name VARCHAR(255) PRIMARY "
+      "KEY, song INT, FOREIGN KEY name REFERENCES test_tbl (first_name))");
+  ProcessQueryInternal(
+      db, "INSERT INTO test_tbl VALUES ('Egor', 'Letov'), ('John', 'Lennon')");
+  ProcessQueryInternal(db, "INSERT INTO test_tbl2 VALUES ('John', 42)");
+  ProcessQueryInternal(db, "DELETE FROM test_tbl WHERE first_name = 'Egor'");
+  auto result =
+      ProcessQueryInternal(db, "SELECT first_name, last_name FROM test_tbl");
+  ASSERT_TRUE(result.has_value());
+  auto& [scan, fields] = result.value();
+  ASSERT_TRUE(scan->Next());
+  ASSERT_EQ(scan->GetField("first_name"),
+            core::FieldVariant(static_cast<std::string>("John")));
+  ASSERT_EQ(scan->GetField("last_name"),
+            core::FieldVariant(static_cast<std::string>("Lennon")));
+  ASSERT_FALSE(scan->Next());
 }
 
 }  // namespace deadfood::tests
